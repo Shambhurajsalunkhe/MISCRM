@@ -1,0 +1,1301 @@
+// =============================================================================
+// Sales CRM — Multi-Vertical Sales Management & Performance Dashboard
+// Database schema (PostgreSQL / Prisma)
+//
+// Design notes live in docs/01-data-model.md
+// Every decision is traced in docs/00-decisions.md
+// =============================================================================
+
+// Prisma 7: the connection URL lives in prisma.config.ts, and the client is
+// constructed with a driver adapter (@prisma/adapter-pg). See src/lib/db.ts.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserRole {
+  ADMIN
+  SALES_HEAD
+  MANAGER
+  BDM
+  BDE
+}
+
+/// The shared pipeline layer (README §8). Every vertical-specific stage maps to
+/// exactly one of these so the all-vertical pipeline chart works (README §26).
+enum CommonStage {
+  NEW
+  CONTACTED
+  REQUIREMENT_GATHERING
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum LeadStatus {
+  OPEN
+  WON
+  LOST
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  LINKEDIN_MESSAGE
+  WHATSAPP
+  NOTE
+  STAGE_CHANGE
+  ASSIGNMENT
+  PROPOSAL_SENT
+  DEMO
+  INTERVIEW
+  FOLLOW_UP
+  PAYMENT
+  DOCUMENT
+  OTHER
+}
+
+enum DocumentType {
+  REQUIREMENT_DOC
+  PROPOSAL
+  ESTIMATE
+  QUOTATION
+  CONTRACT
+  INVOICE
+  RESUME
+  CHAT_TRANSCRIPT
+  CASE_STUDY
+  OTHER
+}
+
+enum RequirementStatus {
+  OPEN
+  ON_HOLD
+  PARTIALLY_FILLED
+  FILLED
+  LOST
+  CANCELLED
+}
+
+enum DemoStatus {
+  SCHEDULED
+  COMPLETED
+  NO_SHOW
+  RESCHEDULED
+  CANCELLED
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum ContractStatus {
+  DRAFT
+  SENT
+  SIGNED
+  ACTIVE
+  COMPLETED
+  TERMINATED
+}
+
+/// README §19 — exact four statuses required by the dashboard.
+enum InvoiceStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum BillingCycle {
+  ONE_TIME
+  MONTHLY
+  QUARTERLY
+  MILESTONE
+  RETAINER
+}
+
+enum PaymentMode {
+  BANK_TRANSFER
+  WIRE
+  UPWORK
+  PAYPAL
+  STRIPE
+  CHEQUE
+  CASH
+  OTHER
+}
+
+enum InterviewResult {
+  PENDING
+  SELECTED
+  REJECTED
+  ON_HOLD
+  NO_SHOW
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  ASSIGN
+  REASSIGN
+  STAGE_CHANGE
+  WON
+  LOST
+  PAYMENT
+  MERGE
+  LOGIN
+  EXPORT
+}
+
+enum EntityType {
+  LEAD
+  CLIENT
+  CONTACT
+  REQUIREMENT
+  CANDIDATE
+  SUBMISSION
+  DEMO
+  QUOTATION
+  CONTRACT
+  INVOICE
+  PAYMENT
+  USER
+  PROSPECTING_ACTIVITY
+}
+
+enum NotificationType {
+  LEAD_ASSIGNED
+  LEAD_REASSIGNED
+  STAGE_CHANGED
+  FOLLOW_UP_DUE
+  FOLLOW_UP_OVERDUE
+  PROPOSAL_FOLLOW_UP
+  NEGOTIATION_FOLLOW_UP
+  INTERVIEW_SCHEDULED
+  INTERVIEW_FOLLOW_UP
+  CLIENT_RESPONSE
+  PAYMENT_DUE
+  PAYMENT_OVERDUE
+  REQUIREMENT_ASSIGNED
+  LEAD_AGING
+  MENTION
+}
+
+// =============================================================================
+// ORGANISATION & ACCESS  (README §32, §33)
+// =============================================================================
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  teams Team[]
+  users User[]
+  leads Lead[]
+}
+
+model Team {
+  id           String  @id @default(cuid())
+  name         String
+  departmentId String?
+  managerId    String?
+  isActive     Boolean @default(true)
+
+  department Department? @relation(fields: [departmentId], references: [id])
+  manager    User?       @relation("TeamManager", fields: [managerId], references: [id])
+  members    User[]      @relation("TeamMembers")
+  leads      Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, departmentId])
+  @@index([managerId])
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  employeeCode       String?  @unique
+  name               String
+  email              String   @unique
+  passwordHash       String
+  role               UserRole
+  designation        String?
+  phone              String?
+  avatarUrl          String?
+  departmentId       String?
+  teamId             String?
+  reportingManagerId String?
+  isActive           Boolean  @default(true)
+  lastLoginAt        DateTime?
+
+  department       Department? @relation(fields: [departmentId], references: [id])
+  team             Team?       @relation("TeamMembers", fields: [teamId], references: [id])
+  reportingManager User?       @relation("ReportingChain", fields: [reportingManagerId], references: [id])
+  directReports    User[]      @relation("ReportingChain")
+  managedTeams     Team[]      @relation("TeamManager")
+
+  // Ownership — README §6.3 requires these to stay separate, permanently.
+  generatedLeads Lead[] @relation("LeadGeneratedBy")
+  assignedLeads  Lead[] @relation("LeadAssignedTo")
+  createdLeads   Lead[] @relation("LeadCreatedBy")
+
+  clientsOwned          Client[]               @relation("ClientOwner")
+  prospectingActivities ProspectingActivity[]
+  activities            Activity[]
+  stageChanges          LeadStageHistory[]
+  assignmentsMade       LeadAssignmentHistory[] @relation("AssignmentActor")
+  assignmentsFrom       LeadAssignmentHistory[] @relation("AssignmentFrom")
+  assignmentsTo         LeadAssignmentHistory[] @relation("AssignmentTo")
+  requirementsAssigned  Requirement[]          @relation("RequirementOwner")
+  candidatesCreated     Candidate[]            @relation("CandidateCreatedBy")
+  submissionsMade       CandidateSubmission[]  @relation("SubmittedBy")
+  demosConducted        Demo[]                 @relation("DemoOwner")
+  documentsUploaded     Document[]
+  paymentsRecorded      Payment[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  savedViews            SavedView[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role, isActive])
+  @@index([teamId])
+  @@index([reportingManagerId])
+}
+
+/// Configurable permission matrix on top of the fixed role set (decision D13).
+model RolePermission {
+  id         String   @id @default(cuid())
+  role       UserRole
+  permission String // e.g. "lead.delete", "report.revenue.view", "master.manage"
+  allowed    Boolean  @default(true)
+
+  @@unique([role, permission])
+}
+
+// =============================================================================
+// MASTER DATA  (README §33)
+// =============================================================================
+
+/// The 8 acquisition channels (README §4). Behaviour flags drive which modules
+/// a lead of this vertical exposes — new verticals default to the common pipeline.
+model SalesVertical {
+  id       String  @id @default(cuid())
+  code     String  @unique // UP, LI, EM, CC, ST, DM, PR, OT
+  name     String  @unique
+  leadPrefix String @unique // "UP" -> UP-0001
+  icon     String?
+  colorHex String?
+  sortOrder Int    @default(0)
+  isActive Boolean @default(true)
+
+  // Module switches
+  usesRequirements Boolean @default(false) // Staffing
+  usesCandidates   Boolean @default(false) // Staffing
+  usesDemos        Boolean @default(false) // Product Sales
+  usesQuotations   Boolean @default(false) // Product Sales
+  usesContracts    Boolean @default(false) // Digital Marketing
+  usesInvoicing    Boolean @default(false) // DM, Product Sales, Staffing (decision D6)
+
+  stages     PipelineStage[]
+  metrics    VerticalMetric[]
+  leads      Lead[]
+  sources    LeadSource[]
+  lostReasons LostReason[]
+  sequences  LeadSequence[]
+  prospectingActivities ProspectingActivity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// One ordered stage list per vertical. `commonStage` is the mapping that makes
+/// the cross-vertical pipeline chart possible without a second status field (D5).
+model PipelineStage {
+  id          String      @id @default(cuid())
+  verticalId  String
+  code        String
+  name        String
+  commonStage CommonStage
+  sortOrder   Int
+  isWon       Boolean     @default(false)
+  isLost      Boolean     @default(false)
+  /// Days after which a lead sitting in this stage is flagged in Pipeline Aging (§29)
+  agingThresholdDays Int? @default(14)
+  isActive    Boolean     @default(true)
+
+  vertical      SalesVertical @relation(fields: [verticalId], references: [id])
+  leadsAtStage  Lead[]
+  historyFrom   LeadStageHistory[] @relation("StageFrom")
+  historyTo     LeadStageHistory[] @relation("StageTo")
+
+  @@unique([verticalId, code])
+  @@index([verticalId, sortOrder])
+}
+
+/// Pre-lead funnel counters (decision D1): pitches submitted, calls made,
+/// emails sent, prospects identified, campaigns run, service inquiries.
+model VerticalMetric {
+  id         String  @id @default(cuid())
+  verticalId String
+  key        String // PITCHES_SUBMITTED, CALLS_MADE, CALLS_CONNECTED, ...
+  label      String
+  sortOrder  Int
+  /// The last counter before a Lead record is created. Used for the
+  /// "counter -> lead" bridge conversion %.
+  isLeadTrigger Boolean @default(false)
+  isActive   Boolean @default(true)
+
+  vertical   SalesVertical         @relation(fields: [verticalId], references: [id])
+  activities ProspectingActivity[]
+
+  @@unique([verticalId, key])
+  @@index([verticalId, sortOrder])
+}
+
+model LeadSource {
+  id         String  @id @default(cuid())
+  name       String
+  verticalId String?
+  isActive   Boolean @default(true)
+
+  vertical SalesVertical? @relation(fields: [verticalId], references: [id])
+  leads    Lead[]
+
+  @@unique([name, verticalId])
+}
+
+model Service {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  category String?
+  isActive Boolean @default(true)
+
+  leads Lead[]
+}
+
+model Product {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  sku       String?  @unique
+  category  String?
+  listPrice Decimal? @db.Decimal(14, 2)
+  isActive  Boolean  @default(true)
+
+  leads          Lead[]
+  demos          Demo[]
+  quotationItems QuotationItem[]
+}
+
+model Country {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  isoCode  String  @unique
+  dialCode String?
+  region   String?
+  isActive Boolean @default(true)
+
+  clients Client[]
+}
+
+model LostReason {
+  id         String  @id @default(cuid())
+  name       String
+  verticalId String? // null = applies to all verticals
+  isActive   Boolean @default(true)
+
+  vertical     SalesVertical? @relation(fields: [verticalId], references: [id])
+  leads        Lead[]
+  requirements Requirement[]
+
+  @@unique([name, verticalId])
+}
+
+model RequirementType {
+  id       String  @id @default(cuid())
+  name     String  @unique // Contract, Full-time, C2H, Offshore
+  isActive Boolean @default(true)
+
+  requirements Requirement[]
+}
+
+/// Staffing requirement stages (README §15), configurable like PipelineStage.
+/// Kept separate from PipelineStage because outcome for Staffing lives on the
+/// Requirement, not the Lead (decision D8).
+model RequirementStage {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  name        String
+  sortOrder   Int
+  isWon       Boolean @default(false) // Placement
+  isLost      Boolean @default(false) // Lost / Not Selected
+  agingThresholdDays Int? @default(21)
+  isActive    Boolean @default(true)
+
+  requirements Requirement[]
+  historyFrom  RequirementStageHistory[] @relation("ReqStageFrom")
+  historyTo    RequirementStageHistory[] @relation("ReqStageTo")
+}
+
+model RequirementStageHistory {
+  id            String   @id @default(cuid())
+  requirementId String
+  fromStageId   String?
+  toStageId     String
+  changedById   String
+  changedAt     DateTime @default(now())
+  hoursInPreviousStage Int?
+  note          String?
+
+  requirement Requirement       @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  fromStage   RequirementStage? @relation("ReqStageFrom", fields: [fromStageId], references: [id])
+  toStage     RequirementStage  @relation("ReqStageTo", fields: [toStageId], references: [id])
+
+  @@index([requirementId, changedAt])
+  @@index([toStageId, changedAt])
+}
+
+/// Candidate pipeline stages (README §16), configurable like PipelineStage.
+model CandidateStage {
+  id         String  @id @default(cuid())
+  code       String  @unique
+  name       String
+  sortOrder  Int
+  isPlaced   Boolean @default(false)
+  isRejected Boolean @default(false)
+  isActive   Boolean @default(true)
+
+  submissions    CandidateSubmission[]
+  historyFrom    CandidateStageHistory[] @relation("CandStageFrom")
+  historyTo      CandidateStageHistory[] @relation("CandStageTo")
+}
+
+model Tag {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  colorHex String?
+
+  leads LeadTag[]
+}
+
+model EmailTemplate {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  subject  String
+  body     String
+  category String?
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AppSetting {
+  key         String  @id
+  value       String
+  description String?
+
+  updatedAt DateTime @updatedAt
+}
+
+/// Atomic per-vertical, per-year counter for UP-0001 style codes (README §5).
+model LeadSequence {
+  verticalId String
+  year       Int
+  lastNumber Int    @default(0)
+
+  vertical SalesVertical @relation(fields: [verticalId], references: [id])
+
+  @@id([verticalId, year])
+}
+
+// =============================================================================
+// CLIENT / ACCOUNT  (README §34)
+// One client holds many opportunities — critical for Staffing (§13).
+// =============================================================================
+
+model Client {
+  id                String  @id @default(cuid())
+  clientCode        String  @unique
+  companyName       String
+  /// lower(companyName) + primary email domain — used by the de-duplication step
+  /// shown in the flowchart's Lead Intake band.
+  dedupeKey         String  @unique
+  website           String?
+  companyLinkedIn   String?
+  industry          String?
+  countryId         String?
+  city              String?
+  address           String?
+  ownerId           String?
+  isActive          Boolean @default(true)
+  isDeleted         Boolean @default(false)
+
+  country  Country? @relation(fields: [countryId], references: [id])
+  owner    User?    @relation("ClientOwner", fields: [ownerId], references: [id])
+
+  contacts     ClientContact[]
+  leads        Lead[]
+  requirements Requirement[]
+  activities   Activity[]
+  documents    Document[]
+  invoices     Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyName])
+  @@index([countryId])
+}
+
+model ClientContact {
+  id             String  @id @default(cuid())
+  clientId       String
+  name           String
+  designation    String?
+  email          String?
+  phone          String?
+  linkedInProfile String?
+  isPrimary      Boolean @default(false)
+  isActive       Boolean @default(true)
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  leads  Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([email])
+  @@index([phone])
+}
+
+// =============================================================================
+// LEAD / OPPORTUNITY — the central object (README §5, §6, §22)
+// =============================================================================
+
+model Lead {
+  id       String @id @default(cuid())
+  leadCode String @unique // UP-0001
+
+  // --- Client (README §6.1) ---
+  clientId         String
+  primaryContactId String?
+
+  // --- Requirement (README §6.2) ---
+  verticalId          String
+  sourceId            String?
+  serviceId           String?
+  productId           String?
+  title               String // "Requirement" — short summary shown in lists
+  requirementDescription String?
+  expectedBudget      Decimal? @db.Decimal(14, 2)
+  dealValue           Decimal? @db.Decimal(14, 2) // agreed value once won
+  expectedTimeline    String?
+  priority            Priority @default(MEDIUM)
+  additionalNotes     String?
+
+  // --- Ownership (README §6.3) — these two must never be merged ---
+  generatedById String
+  assignedToId  String?
+  teamId        String?
+  departmentId  String?
+
+  // --- Stage (decision D5) ---
+  currentStageId String?
+  commonStage    CommonStage @default(NEW) // derived from currentStageId, denormalised for fast filtering
+  status         LeadStatus  @default(OPEN)
+  stageChangedAt DateTime    @default(now())
+
+  // --- Outcome ---
+  lostReasonId String?
+  lostNotes    String?
+  closedAt     DateTime?
+
+  // --- Additional info (README §6.4) ---
+  campaignName     String?
+  referenceUrl     String? // Upwork job URL, LinkedIn profile, landing page
+  nextFollowUpAt   DateTime?
+  expectedCloseDate DateTime?
+
+  /// Links a lead back to the counter batch that produced it (decision D1),
+  /// so "responses -> leads" is auditable.
+  sourceActivityId String?
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // --- Relations ---
+  client         Client         @relation(fields: [clientId], references: [id])
+  primaryContact ClientContact? @relation(fields: [primaryContactId], references: [id])
+  vertical       SalesVertical  @relation(fields: [verticalId], references: [id])
+  source         LeadSource?    @relation(fields: [sourceId], references: [id])
+  service        Service?       @relation(fields: [serviceId], references: [id])
+  product        Product?       @relation(fields: [productId], references: [id])
+  generatedBy    User           @relation("LeadGeneratedBy", fields: [generatedById], references: [id])
+  assignedTo     User?          @relation("LeadAssignedTo", fields: [assignedToId], references: [id])
+  createdBy      User           @relation("LeadCreatedBy", fields: [createdById], references: [id])
+  team           Team?          @relation(fields: [teamId], references: [id])
+  department     Department?    @relation(fields: [departmentId], references: [id])
+  currentStage   PipelineStage? @relation(fields: [currentStageId], references: [id])
+  lostReason     LostReason?    @relation(fields: [lostReasonId], references: [id])
+  sourceActivity ProspectingActivity? @relation(fields: [sourceActivityId], references: [id])
+
+  stageHistory      LeadStageHistory[]
+  assignmentHistory LeadAssignmentHistory[]
+  activities        Activity[]
+  documents         Document[]
+  tags              LeadTag[]
+  requirements      Requirement[]
+  demos             Demo[]
+  quotations        Quotation[]
+  contracts         Contract[]
+  invoices          Invoice[]
+  placements        Placement[]
+
+  @@index([verticalId, commonStage])
+  @@index([status, verticalId])
+  @@index([generatedById])
+  @@index([assignedToId])
+  @@index([clientId])
+  @@index([createdAt])
+  @@index([nextFollowUpAt])
+  @@index([teamId])
+  @@index([isDeleted, status])
+}
+
+model LeadTag {
+  leadId String
+  tagId  String
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+}
+
+/// Every stage transition. This table — not Lead.currentStageId — is the source
+/// of truth for every conversion % and the Pipeline Aging report (decision D12).
+model LeadStageHistory {
+  id              String       @id @default(cuid())
+  leadId          String
+  fromStageId     String?
+  toStageId       String
+  fromCommonStage CommonStage?
+  toCommonStage   CommonStage
+  changedById     String
+  changedAt       DateTime     @default(now())
+  /// Hours the lead spent in the previous stage — precomputed for aging reports.
+  hoursInPreviousStage Int?
+  note            String?
+
+  lead      Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  fromStage PipelineStage? @relation("StageFrom", fields: [fromStageId], references: [id])
+  toStage   PipelineStage  @relation("StageTo", fields: [toStageId], references: [id])
+  changedBy User          @relation(fields: [changedById], references: [id])
+
+  @@index([leadId, changedAt])
+  @@index([toStageId, changedAt])
+  @@index([toCommonStage, changedAt])
+}
+
+/// README §7 — ownership history must be preserved.
+model LeadAssignmentHistory {
+  id           String   @id @default(cuid())
+  leadId       String
+  fromUserId   String?
+  toUserId     String
+  assignedById String
+  assignedAt   DateTime @default(now())
+  reason       String?
+
+  lead       Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  fromUser   User? @relation("AssignmentFrom", fields: [fromUserId], references: [id])
+  toUser     User  @relation("AssignmentTo", fields: [toUserId], references: [id])
+  assignedBy User  @relation("AssignmentActor", fields: [assignedById], references: [id])
+
+  @@index([leadId, assignedAt])
+}
+
+// =============================================================================
+// TOP-OF-FUNNEL COUNTERS  (decision D1)
+// 850 pitches / 2,500 calls / 1,200 emails live here, not in the Lead table.
+// =============================================================================
+
+model ProspectingActivity {
+  id           String   @id @default(cuid())
+  verticalId   String
+  metricId     String
+  userId       String
+  activityDate DateTime @db.Date
+  count        Int
+  notes        String?
+  /// Optional itemised detail — e.g. a single Upwork pitch with its job URL.
+  referenceUrl String?
+  clientId     String?
+
+  vertical SalesVertical  @relation(fields: [verticalId], references: [id])
+  metric   VerticalMetric @relation(fields: [metricId], references: [id])
+  user     User           @relation(fields: [userId], references: [id])
+  leads    Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([verticalId, activityDate])
+  @@index([userId, activityDate])
+  @@index([metricId, activityDate])
+}
+
+// =============================================================================
+// STAFFING  (README §13–§17, decisions D8 & D9)
+// Client -> Lead -> many Requirements -> many Candidate submissions
+// =============================================================================
+
+model Requirement {
+  id              String @id @default(cuid())
+  requirementCode String @unique // REQ-001
+
+  leadId   String
+  clientId String
+
+  position          String
+  requirementTypeId String?
+  openings          Int     @default(1)
+  positionsFilled   Int     @default(0)
+  skills            String?
+  minExperience     Decimal? @db.Decimal(4, 1)
+  maxExperience     Decimal? @db.Decimal(4, 1)
+  location          String?
+  workMode          String? // Onsite / Remote / Hybrid
+  budgetMin         Decimal? @db.Decimal(14, 2)
+  budgetMax         Decimal? @db.Decimal(14, 2)
+  targetDate        DateTime?
+  priority          Priority @default(MEDIUM)
+  description       String?
+
+  // Outcome lives here, not on the Lead (decision D8)
+  status         RequirementStatus @default(OPEN)
+  currentStageId String?
+  stageChangedAt DateTime          @default(now())
+  lostReasonId   String?
+  closedAt       DateTime?
+
+  assignedToId String?
+  createdById  String
+  isDeleted    Boolean @default(false)
+
+  lead            Lead             @relation(fields: [leadId], references: [id])
+  client          Client           @relation(fields: [clientId], references: [id])
+  requirementType RequirementType?  @relation(fields: [requirementTypeId], references: [id])
+  lostReason      LostReason?       @relation(fields: [lostReasonId], references: [id])
+  assignedTo      User?             @relation("RequirementOwner", fields: [assignedToId], references: [id])
+  currentStage    RequirementStage? @relation(fields: [currentStageId], references: [id])
+
+  stageHistory RequirementStageHistory[]
+  submissions  CandidateSubmission[]
+  placements   Placement[]
+  activities   Activity[]
+  documents    Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([clientId, status])
+  @@index([assignedToId])
+  @@index([status, createdAt])
+}
+
+/// Reusable candidate master (decision D9) — the same person can be submitted
+/// to several requirements without being counted twice as "sourced".
+model Candidate {
+  id            String @id @default(cuid())
+  candidateCode String @unique
+
+  fullName            String
+  email               String?
+  phone               String?
+  currentLocation     String?
+  preferredLocation   String?
+  totalExperienceYears Decimal? @db.Decimal(4, 1)
+  primarySkills       String?
+  currentEmployer     String?
+  currentCtc          Decimal? @db.Decimal(14, 2)
+  expectedCtc         Decimal? @db.Decimal(14, 2)
+  noticePeriodDays    Int?
+  linkedInProfile     String?
+  sourceChannel       String? // Naukri, LinkedIn, Referral, Internal bench
+  notes               String?
+  isActive            Boolean @default(true)
+  isDeleted           Boolean @default(false)
+
+  createdById String
+  createdBy   User   @relation("CandidateCreatedBy", fields: [createdById], references: [id])
+
+  submissions CandidateSubmission[]
+  placements  Placement[]
+  documents   Document[]
+  activities  Activity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fullName])
+  @@index([email])
+  @@index([phone])
+}
+
+/// The join that carries per-requirement progress (README §16).
+model CandidateSubmission {
+  id            String @id @default(cuid())
+  requirementId String
+  candidateId   String
+
+  currentStageId String
+  submittedById  String
+  submittedAt    DateTime @default(now())
+  stageChangedAt DateTime @default(now())
+
+  clientFeedback String?
+  rejectedReason String?
+  offerDate      DateTime?
+  joiningDate    DateTime?
+
+  // Commercials for the placement, if it converts
+  offeredSalary  Decimal? @db.Decimal(14, 2)
+  billRate       Decimal? @db.Decimal(14, 2)
+
+  requirement  Requirement    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  candidate    Candidate      @relation(fields: [candidateId], references: [id])
+  currentStage CandidateStage @relation(fields: [currentStageId], references: [id])
+  submittedBy  User           @relation("SubmittedBy", fields: [submittedById], references: [id])
+
+  interviews   Interview[]
+  stageHistory CandidateStageHistory[]
+  placement    Placement?
+  documents    Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([requirementId, candidateId])
+  @@index([requirementId, currentStageId])
+  @@index([candidateId])
+}
+
+model CandidateStageHistory {
+  id           String   @id @default(cuid())
+  submissionId String
+  fromStageId  String?
+  toStageId    String
+  changedById  String
+  changedAt    DateTime @default(now())
+  note         String?
+
+  submission CandidateSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fromStage  CandidateStage?     @relation("CandStageFrom", fields: [fromStageId], references: [id])
+  toStage    CandidateStage      @relation("CandStageTo", fields: [toStageId], references: [id])
+
+  @@index([submissionId, changedAt])
+  @@index([toStageId, changedAt])
+}
+
+model Interview {
+  id           String   @id @default(cuid())
+  submissionId String
+  roundNumber  Int      @default(1)
+  scheduledAt  DateTime
+  completedAt  DateTime?
+  mode         String? // Telephonic / Video / F2F
+  interviewerName String?
+  feedback     String?
+  result       InterviewResult @default(PENDING)
+
+  submission CandidateSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([submissionId, roundNumber])
+  @@index([scheduledAt])
+}
+
+/// Revenue unit for Staffing (decision D8) — one row per candidate who joins.
+model Placement {
+  id            String @id @default(cuid())
+  submissionId  String @unique
+  requirementId String
+  leadId        String
+  candidateId   String
+
+  joiningDate   DateTime
+  salary        Decimal? @db.Decimal(14, 2)
+  billRate      Decimal? @db.Decimal(14, 2)
+  /// Revenue booked against this placement (fee or margin, per your model).
+  placementValue Decimal @db.Decimal(14, 2)
+  marginPerMonth Decimal? @db.Decimal(14, 2)
+  guaranteePeriodDays Int?
+
+  submission  CandidateSubmission @relation(fields: [submissionId], references: [id])
+  requirement Requirement         @relation(fields: [requirementId], references: [id])
+  lead        Lead                @relation(fields: [leadId], references: [id])
+  candidate   Candidate           @relation(fields: [candidateId], references: [id])
+  invoices    Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requirementId])
+  @@index([leadId])
+  @@index([joiningDate])
+}
+
+// =============================================================================
+// PRODUCT SALES  (README §20, decision D11)
+// =============================================================================
+
+model Demo {
+  id          String     @id @default(cuid())
+  leadId      String
+  productId   String?
+  scheduledAt DateTime
+  completedAt DateTime?
+  status      DemoStatus @default(SCHEDULED)
+  conductedById String?
+  attendees   String?
+  feedback    String?
+  notes       String?
+
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id])
+  conductedBy User?    @relation("DemoOwner", fields: [conductedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([status, scheduledAt])
+}
+
+model Quotation {
+  id          String          @id @default(cuid())
+  leadId      String
+  quoteNumber String          @unique
+  quoteDate   DateTime        @default(now())
+  validUntil  DateTime?
+  subtotal    Decimal         @db.Decimal(14, 2)
+  discount    Decimal         @default(0) @db.Decimal(14, 2)
+  taxAmount   Decimal         @default(0) @db.Decimal(14, 2)
+  totalAmount Decimal         @db.Decimal(14, 2)
+  status      QuotationStatus @default(DRAFT)
+  notes       String?
+
+  lead      Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  items     QuotationItem[]
+  invoices  Invoice[]
+  documents Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId, status])
+}
+
+model QuotationItem {
+  id          String  @id @default(cuid())
+  quotationId String
+  productId   String?
+  description String
+  quantity    Decimal @default(1) @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(14, 2)
+  lineTotal   Decimal @db.Decimal(14, 2)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id])
+
+  @@index([quotationId])
+}
+
+// =============================================================================
+// COMMERCIALS — Contract / Invoice / Payment  (README §19, decisions D6, D10)
+// Applies to Digital Marketing, Product Sales and Staffing.
+// =============================================================================
+
+model Contract {
+  id             String         @id @default(cuid())
+  leadId         String
+  contractNumber String         @unique
+  contractValue  Decimal        @db.Decimal(14, 2)
+  billingCycle   BillingCycle   @default(ONE_TIME)
+  startDate      DateTime?
+  endDate        DateTime?
+  signedDate     DateTime?
+  status         ContractStatus @default(DRAFT)
+  notes          String?
+
+  lead      Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  invoices  Invoice[]
+  documents Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId, status])
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  leadId        String
+  clientId      String
+  contractId    String?
+  quotationId   String?
+  placementId   String?
+
+  invoiceDate    DateTime      @default(now())
+  dueDate        DateTime?
+  amount         Decimal       @db.Decimal(14, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  totalAmount    Decimal       @db.Decimal(14, 2)
+  /// Maintained as the sum of related Payment rows.
+  amountReceived Decimal       @default(0) @db.Decimal(14, 2)
+  /// totalAmount - amountReceived. Feeds the dashboard's Pending Revenue card.
+  amountPending  Decimal       @db.Decimal(14, 2)
+  status         InvoiceStatus @default(PENDING)
+  notes          String?
+
+  lead      Lead       @relation(fields: [leadId], references: [id])
+  client    Client     @relation(fields: [clientId], references: [id])
+  contract  Contract?  @relation(fields: [contractId], references: [id])
+  quotation Quotation? @relation(fields: [quotationId], references: [id])
+  placement Placement? @relation(fields: [placementId], references: [id])
+
+  payments  Payment[]
+  documents Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([clientId, status])
+  @@index([status, dueDate])
+  @@index([invoiceDate])
+}
+
+model Payment {
+  id              String      @id @default(cuid())
+  invoiceId       String
+  amount          Decimal     @db.Decimal(14, 2)
+  paymentDate     DateTime
+  mode            PaymentMode @default(BANK_TRANSFER)
+  referenceNumber String?
+  notes           String?
+  recordedById    String
+
+  invoice    Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([paymentDate])
+}
+
+// =============================================================================
+// ACTIVITY, DOCUMENTS, AUDIT  (README §23, §35, §36)
+// =============================================================================
+
+/// The chronological timeline shown on the lead drill-down page (README §23).
+model Activity {
+  id           String       @id @default(cuid())
+  type         ActivityType
+  subject      String
+  notes        String?
+  activityDate DateTime     @default(now())
+  outcome      String?
+  followUpDate DateTime?
+  userId       String
+
+  // Attach to whichever entity the activity belongs to
+  leadId        String?
+  clientId      String?
+  requirementId String?
+  candidateId   String?
+
+  user        User         @relation(fields: [userId], references: [id])
+  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  client      Client?      @relation(fields: [clientId], references: [id])
+  requirement Requirement? @relation(fields: [requirementId], references: [id])
+  candidate   Candidate?   @relation(fields: [candidateId], references: [id])
+
+  documents Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId, activityDate])
+  @@index([userId, activityDate])
+  @@index([followUpDate])
+  @@index([type, activityDate])
+}
+
+model Document {
+  id           String       @id @default(cuid())
+  fileName     String
+  storageKey   String // S3 key or relative disk path
+  mimeType     String
+  sizeBytes    Int
+  docType      DocumentType @default(OTHER)
+  description  String?
+  uploadedById String
+
+  leadId        String?
+  clientId      String?
+  requirementId String?
+  candidateId   String?
+  submissionId  String?
+  quotationId   String?
+  contractId    String?
+  invoiceId     String?
+  activityId    String?
+
+  uploadedBy  User                 @relation(fields: [uploadedById], references: [id])
+  lead        Lead?                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  client      Client?              @relation(fields: [clientId], references: [id])
+  requirement Requirement?         @relation(fields: [requirementId], references: [id])
+  candidate   Candidate?           @relation(fields: [candidateId], references: [id])
+  submission  CandidateSubmission? @relation(fields: [submissionId], references: [id])
+  quotation   Quotation?           @relation(fields: [quotationId], references: [id])
+  contract    Contract?            @relation(fields: [contractId], references: [id])
+  invoice     Invoice?             @relation(fields: [invoiceId], references: [id])
+  activity    Activity?            @relation(fields: [activityId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([clientId])
+  @@index([requirementId])
+  @@index([candidateId])
+}
+
+/// README §35 — user, action, timestamp, previous value, new value.
+model AuditLog {
+  id         String      @id @default(cuid())
+  entityType EntityType
+  entityId   String
+  action     AuditAction
+  fieldName  String?
+  oldValue   String?
+  newValue   String?
+  userId     String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+// =============================================================================
+// NOTIFICATIONS & SAVED VIEWS  (README §31, §30)
+// =============================================================================
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  type       NotificationType
+  title      String
+  message    String
+  entityType EntityType?
+  entityId   String?
+  isRead     Boolean          @default(false)
+  readAt     DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead, createdAt])
+}
+
+model NotificationRule {
+  id        String           @id @default(cuid())
+  role      UserRole?
+  userId    String?
+  type      NotificationType
+  inApp     Boolean          @default(true)
+  email     Boolean          @default(false)
+  isActive  Boolean          @default(true)
+
+  @@unique([role, userId, type])
+}
+
+/// Saved filter combinations for the lead list (README §30).
+model SavedView {
+  id        String  @id @default(cuid())
+  userId    String
+  name      String
+  entity    EntityType @default(LEAD)
+  filters   Json
+  isShared  Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name, entity])
+}
+
+// =============================================================================
+// AUTOMATION  (flowchart master-data panel: "Automations & Workflows")
+// Stub for a later phase — no runtime dependency in v1.
+// =============================================================================
+
+model AutomationRule {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  triggerEvent String
+  conditions   Json
+  actions      Json
+  isActive     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
