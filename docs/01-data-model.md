@@ -1,6 +1,6 @@
 # Data Model
 
-Executable schema: [`prisma/schema.prisma`](../prisma/schema.prisma) — 38 models.
+Executable schema: [`prisma/schema.prisma`](../prisma/schema.prisma) — 46 models.
 This document explains the shape and the reasoning.
 
 ---

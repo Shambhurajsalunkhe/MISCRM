@@ -8,6 +8,7 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   type Permission,
 } from '@/lib/permissions'
+import { AuthorizationError } from '@/lib/errors'
 import type { UserRole } from '@/generated/prisma/enums'
 
 /**
@@ -48,7 +49,7 @@ export async function requirePermission(
   const user = await requireUser()
 
   if (!(await can(user, permission))) {
-    throw new Error(`FORBIDDEN: ${permission}`)
+    throw new AuthorizationError(permission)
   }
 
   return user

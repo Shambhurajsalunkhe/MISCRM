@@ -237,7 +237,7 @@ the Kanban board and the "open pipeline" widget.
 |---|---|
 | Call → Connected % | `counter(CALLS_CONNECTED) ÷ counter(CALLS_MADE)` |
 | Connected → Interested % | `leads created ÷ counter(CALLS_CONNECTED)` |
-| Interested → Lead % | `reached(OPPORTUNITY_CREATED) ÷ leads created` |
+| Interested → Opportunity Created % *(README's "Interested → Lead")* | `reached(OPPORTUNITY_CREATED) ÷ leads created` |
 | Lead → Proposal % | `reached(PROPOSAL_SHARED) ÷ reached(OPPORTUNITY_CREATED)` |
 | Proposal → Negotiation % | `reached(NEGOTIATION) ÷ reached(PROPOSAL_SHARED)` |
 | Negotiation → Won % | `reached(WON) ÷ reached(NEGOTIATION)` |
@@ -304,15 +304,38 @@ equivalent of `reached()`, read from `CandidateStageHistory`.
 
 | KPI | Formula |
 |---|---|
+**Every KPI in this table counts leads, and only leads.** Requirement-level
+outcomes are reported separately below — mixing the two double-counts Staffing,
+because a staffing lead with two filled requirements would otherwise register as
+one won lead *plus* two won requirements.
+
+| KPI | Formula |
+|---|---|
 | Total Leads | `COUNT(Lead)` in range |
 | Open Leads | `COUNT(Lead WHERE status = OPEN)` |
-| Won | `COUNT(Lead WHERE status = WON)` + `COUNT(Requirement WHERE status IN (FILLED, PARTIALLY_FILLED))` for Staffing |
-| Lost | `COUNT(Lead WHERE status = LOST)` + lost requirements |
-| Overall Conversion | `won ÷ (won + lost)` |
+| Won | `COUNT(Lead WHERE status = WON)` |
+| Lost | `COUNT(Lead WHERE status = LOST)` |
+| Overall Conversion | `won ÷ (won + lost)` — both sides are lead counts |
 | Pipeline Value | `SUM(COALESCE(dealValue, expectedBudget)) WHERE status = OPEN` |
 | **Won Revenue** | non-staffing: `SUM(Lead.dealValue WHERE status = WON)`; staffing: `SUM(Placement.placementValue)` |
 | **Collected Revenue** | `SUM(Payment.amount)` |
 | **Pending Revenue** | `SUM(Invoice.amountPending WHERE status ≠ CANCELLED)` |
+
+Recall that a Staffing lead's status is *derived* (decision D8): WON once any
+requirement is filled, LOST when all are lost. So it contributes exactly one
+row to the counts above, the same as every other vertical.
+
+### Staffing requirement KPIs — counted separately
+
+| KPI | Formula |
+|---|---|
+| Requirements Filled | `COUNT(Requirement WHERE status IN (FILLED, PARTIALLY_FILLED))` |
+| Requirements Lost | `COUNT(Requirement WHERE status = LOST)` |
+| Requirement Conversion | `filled ÷ (filled + lost)` |
+| Fill Rate | `SUM(positionsFilled) ÷ SUM(openings)` |
+
+Never add these to the lead KPIs. They answer a different question — *how much
+of the demand did we service* — in a different unit.
 
 ### ⚠ One consequence of decision D6 you should be aware of
 

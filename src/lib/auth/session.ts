@@ -12,6 +12,7 @@ import {
   type SessionPayload,
 } from '@/lib/auth/jwt'
 import { env } from '@/env'
+import { AuthenticationError } from '@/lib/errors'
 
 export async function createSession(payload: SessionPayload): Promise<void> {
   const token = await signSession(payload)
@@ -79,7 +80,7 @@ export type CurrentUser = NonNullable<
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser()
   if (!user) {
-    throw new Error('UNAUTHENTICATED')
+    throw new AuthenticationError()
   }
   return user
 }

@@ -37,6 +37,10 @@ yarn-error.log*
 # generated Prisma client
 /src/generated
 
+# machine-specific tooling config (WSL distro, mount paths)
+.claude/coderabbit.local.json
+.claude/launch.json
+
 # vercel
 .vercel
 

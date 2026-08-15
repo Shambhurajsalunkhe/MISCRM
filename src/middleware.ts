@@ -18,11 +18,13 @@ export async function middleware(request: NextRequest) {
   const publicPath = isPublicPath(pathname)
 
   if (!session && !publicPath) {
+    // Keep the query string too — bouncing someone off a filtered lead list
+    // and returning them to an unfiltered one loses their place.
+    const returnTo = `${pathname}${request.nextUrl.search}`
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.search = ''
-    // Preserve where they were heading so login can send them back.
-    if (pathname !== '/') url.searchParams.set('next', pathname)
+    if (returnTo !== '/') url.searchParams.set('next', returnTo)
     return NextResponse.redirect(url)
   }
 

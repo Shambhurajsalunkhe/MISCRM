@@ -15,6 +15,34 @@ const loginSchema = z.object({
 
 export type LoginState = { error: string | null }
 
+/**
+ * A real bcrypt hash (cost 12) of a random string nobody holds.
+ *
+ * When the email is unknown or the account is deactivated we still run one
+ * bcrypt comparison against this, so every failed login costs the same ~250ms
+ * regardless of whether the address exists. Without it, an unknown address
+ * returns in single-digit milliseconds and the response time alone enumerates
+ * valid accounts — the identical error message is not sufficient on its own.
+ */
+const DUMMY_PASSWORD_HASH =
+  '$2b$12$qYo5K2W.voBb3IqTb8LiKuRMrg9mQnIf7vfoHFDQQO.TxGjhlW9Zu'
+
+/**
+ * True only for same-origin relative paths.
+ *
+ * `//evil.com` and `/\evil.com` are both protocol-relative once the browser
+ * normalises backslashes, so a lone `startsWith('/')` check is an open
+ * redirect. Reject anything whose second character opens an authority.
+ */
+function isSafeRedirectTarget(value: string | undefined): value is string {
+  return (
+    typeof value === 'string' &&
+    value.startsWith('/') &&
+    value[1] !== '/' &&
+    value[1] !== '\\'
+  )
+}
+
 export async function loginAction(
   _previous: LoginState,
   formData: FormData,
@@ -49,13 +77,14 @@ export async function loginAction(
   // exists in the system.
   const invalid = { error: 'Invalid email address or password.' }
 
-  if (!user || !user.isActive) return invalid
-
+  // Always exactly one bcrypt comparison, so the timing of a failure does not
+  // reveal whether the address is registered. Do not short-circuit above this.
   const passwordMatches = await verifyPassword(
     parsed.data.password,
-    user.passwordHash,
+    user?.passwordHash ?? DUMMY_PASSWORD_HASH,
   )
-  if (!passwordMatches) return invalid
+
+  if (!user || !user.isActive || !passwordMatches) return invalid
 
   await prisma.user.update({
     where: { id: user.id },
@@ -69,15 +98,7 @@ export async function loginAction(
     role: user.role,
   })
 
-  // Only allow same-origin relative paths, so `?next=` cannot be used to
-  // bounce a freshly signed-in user off to another site.
-  const target =
-    parsed.data.next && parsed.data.next.startsWith('/') &&
-    !parsed.data.next.startsWith('//')
-      ? parsed.data.next
-      : '/'
-
-  redirect(target)
+  redirect(isSafeRedirectTarget(parsed.data.next) ? parsed.data.next : '/')
 }
 
 export async function logoutAction(): Promise<void> {

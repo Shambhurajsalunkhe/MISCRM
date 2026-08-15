@@ -517,39 +517,75 @@ async function seedMasterData() {
     })
 
     for (const [stageIndex, stage] of stages.entries()) {
+      // Spreading the literal would omit absent optional flags, so an update
+      // could never clear a flag that had moved to another stage. Default
+      // every flag explicitly.
+      const data = {
+        code: stage.code,
+        name: stage.name,
+        commonStage: stage.commonStage,
+        sortOrder: stageIndex,
+        isWon: stage.isWon ?? false,
+        isLost: stage.isLost ?? false,
+        agingThresholdDays: stage.agingThresholdDays ?? null,
+      }
+
       await prisma.pipelineStage.upsert({
         where: {
           verticalId_code: { verticalId: saved.id, code: stage.code },
         },
-        update: { ...stage, sortOrder: stageIndex },
-        create: { ...stage, sortOrder: stageIndex, verticalId: saved.id },
+        update: data,
+        create: { ...data, verticalId: saved.id },
       })
     }
 
     for (const [metricIndex, metric] of metrics.entries()) {
+      const data = {
+        key: metric.key,
+        label: metric.label,
+        sortOrder: metricIndex,
+        isLeadTrigger: metric.isLeadTrigger ?? false,
+      }
+
       await prisma.verticalMetric.upsert({
         where: { verticalId_key: { verticalId: saved.id, key: metric.key } },
-        update: { ...metric, sortOrder: metricIndex },
-        create: { ...metric, sortOrder: metricIndex, verticalId: saved.id },
+        update: data,
+        create: { ...data, verticalId: saved.id },
       })
     }
   }
 
   console.log('→ Requirement stages')
   for (const [index, stage] of REQUIREMENT_STAGES.entries()) {
+    const data = {
+      code: stage.code,
+      name: stage.name,
+      sortOrder: index,
+      isWon: stage.isWon ?? false,
+      isLost: stage.isLost ?? false,
+    }
+
     await prisma.requirementStage.upsert({
       where: { code: stage.code },
-      update: { ...stage, sortOrder: index },
-      create: { ...stage, sortOrder: index },
+      update: data,
+      create: data,
     })
   }
 
   console.log('→ Candidate stages')
   for (const [index, stage] of CANDIDATE_STAGES.entries()) {
+    const data = {
+      code: stage.code,
+      name: stage.name,
+      sortOrder: index,
+      isPlaced: stage.isPlaced ?? false,
+      isRejected: stage.isRejected ?? false,
+    }
+
     await prisma.candidateStage.upsert({
       where: { code: stage.code },
-      update: { ...stage, sortOrder: index },
-      create: { ...stage, sortOrder: index },
+      update: data,
+      create: data,
     })
   }
 
@@ -585,11 +621,19 @@ async function seedMasterData() {
   console.log('→ Role permissions')
   for (const [role, permissions] of Object.entries(ROLE_PERMISSIONS)) {
     for (const permission of PERMISSION_KEYS) {
+      // Sync `allowed` on update as well as create, so changing a default in
+      // src/lib/permissions.ts actually takes effect on re-seed.
+      //
+      // Trade-off worth knowing: this means re-running the seed RESETS any
+      // toggles an administrator made in /admin/permissions. That matches how
+      // every other master-data table here behaves, and matches what the docs
+      // promise. If you want admin edits to survive a re-seed, this is the
+      // line to change.
       await prisma.rolePermission.upsert({
         where: {
           role_permission: { role: role as UserRole, permission },
         },
-        update: {},
+        update: { allowed: permissions.includes(permission) },
         create: {
           role: role as UserRole,
           permission,

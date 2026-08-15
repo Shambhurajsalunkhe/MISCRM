@@ -281,6 +281,7 @@ model User {
   paymentsRecorded      Payment[]
   auditLogs             AuditLog[]
   notifications         Notification[]
+  notificationRules     NotificationRule[]
   savedViews            SavedView[]
 
   createdAt DateTime @default(now())
@@ -1023,7 +1024,9 @@ model Quotation {
   status      QuotationStatus @default(DRAFT)
   notes       String?
 
-  lead      Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade: deleting a lead must never silently destroy
+  // commercial records. Leads are soft-deleted anyway (Lead.isDeleted).
+  lead      Lead            @relation(fields: [leadId], references: [id], onDelete: Restrict)
   items     QuotationItem[]
   invoices  Invoice[]
   documents Document[]
@@ -1066,7 +1069,9 @@ model Contract {
   status         ContractStatus @default(DRAFT)
   notes          String?
 
-  lead      Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // Restrict for the same reason as Quotation — a signed contract outlives
+  // any tidy-up of the lead that produced it.
+  lead      Lead       @relation(fields: [leadId], references: [id], onDelete: Restrict)
   invoices  Invoice[]
   documents Document[]
 
@@ -1125,7 +1130,9 @@ model Payment {
   notes           String?
   recordedById    String
 
-  invoice    Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  // Restrict: a received payment is a financial fact. Cancel the invoice
+  // (InvoiceStatus.CANCELLED) rather than deleting it out from under receipts.
+  invoice    Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
   recordedBy User    @relation(fields: [recordedById], references: [id])
 
   createdAt DateTime @default(now())
@@ -1263,7 +1270,16 @@ model NotificationRule {
   email     Boolean          @default(false)
   isActive  Boolean          @default(true)
 
+  /// Rules can be scoped to a role, to a single user, or both. Cascade so
+  /// deleting a user cannot leave a rule pointing at a missing id.
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// NOTE: this composite is NOT sufficient on its own — PostgreSQL treats
+  /// NULL as distinct, so (NULL, NULL, FOLLOW_UP_DUE) can be inserted twice.
+  /// Partial unique indexes covering the NULL cases are added in the
+  /// `harden_null_uniques` migration.
   @@unique([role, userId, type])
+  @@index([userId])
 }
 
 /// Saved filter combinations for the lead list (README §30).
