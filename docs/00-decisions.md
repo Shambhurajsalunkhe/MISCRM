@@ -83,7 +83,34 @@ flowchart's master-data panel lists `Roles & Permissions`.
 
 ---
 
-## 3. Still open — please confirm before Phase 3
+## 3. Open questions — defaults accepted 16 Aug 2026
+
+You accepted the proposed default for every question below rather than
+answering them individually, so **the defaults in the right-hand column are now
+what is being built**, including Q11 (collected/pending revenue for the four
+non-invoicing verticals) in
+[`02-funnels-and-metrics.md`](02-funnels-and-metrics.md) §5.
+
+Each is still a decision rather than a fact about your business. The ones that
+would be most expensive to reverse later, and so are worth a second look before
+Phase 3 lands:
+
+- **Q1 — the counter-vs-lead cut-off per vertical.** This decides what counts
+  as a lead at all, and therefore every conversion percentage on the dashboard.
+  Changing it later re-bases historical numbers.
+- **Q2 — backward stage movement is allowed**, with a mandatory reason recorded
+  in stage history. If your process forbids it, say so: "ever reached" metrics
+  (decision D12) read differently when a lead can revisit a stage.
+- **Q3 — a Sales Head may reassign between BDMs**, with full history and a
+  notification to both parties.
+- **Q10 — soft delete**, recoverable by Admin. This is already how Phase 1
+  behaves: nothing in the admin area hard-deletes, everything deactivates.
+
+Cheaper to change, decided and moving on: Q4, Q5, Q6, Q8 and Q9 as tabled
+below. Note the Q9 row's default reads "S3-compatible, local disk fallback";
+what is being built is the reverse emphasis — **local disk first**, behind a
+storage interface an S3 adapter slots into without touching call sites. Same
+interface either way, so the hosting answer (Q7) can still decide it.
 
 | # | Question | My proposed default |
 |---|---|---|

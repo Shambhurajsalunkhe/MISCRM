@@ -42,6 +42,103 @@ export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
 
 export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS)
 
+/**
+ * Display metadata for the permission matrix at /admin/permissions.
+ *
+ * `scoped` marks the ◐ rows in docs/03-screens-and-roles.md §2: capabilities
+ * where holding the permission still does not mean seeing every record. Those
+ * two things are separate on purpose — the grid says *what* a role may do, and
+ * `src/lib/visibility.ts` decides *which records* they may do it to. Showing
+ * the distinction here stops an administrator from ticking "View leads" for
+ * BDE and expecting it to reveal the whole company's pipeline.
+ */
+export type PermissionMeta = {
+  permission: Permission
+  label: string
+  /** Scope still applies: the role sees only their own or their team's records. */
+  scoped?: boolean
+}
+
+export const PERMISSION_GROUPS: Array<{
+  heading: string
+  permissions: PermissionMeta[]
+}> = [
+  {
+    heading: 'Leads',
+    permissions: [
+      { permission: PERMISSIONS.LEAD_CREATE, label: 'Create lead' },
+      { permission: PERMISSIONS.LEAD_VIEW, label: 'View leads', scoped: true },
+      { permission: PERMISSIONS.LEAD_EDIT, label: 'Edit lead', scoped: true },
+      { permission: PERMISSIONS.LEAD_STAGE_CHANGE, label: 'Change stage', scoped: true },
+      { permission: PERMISSIONS.LEAD_ASSIGN, label: 'Assign / reassign lead', scoped: true },
+      {
+        permission: PERMISSIONS.LEAD_COMMERCIAL,
+        label: 'Set deal value, mark Won / Lost',
+        scoped: true,
+      },
+      { permission: PERMISSIONS.LEAD_DELETE, label: 'Delete (soft) lead', scoped: true },
+    ],
+  },
+  {
+    heading: 'Activity',
+    permissions: [
+      { permission: PERMISSIONS.PROSPECTING_LOG, label: 'Log prospecting counters' },
+      {
+        permission: PERMISSIONS.ACTIVITY_MANAGE,
+        label: 'Add activities & documents',
+        scoped: true,
+      },
+    ],
+  },
+  {
+    heading: 'Staffing',
+    permissions: [
+      {
+        permission: PERMISSIONS.STAFFING_REQUIREMENT_MANAGE,
+        label: 'Manage requirements',
+        scoped: true,
+      },
+      {
+        permission: PERMISSIONS.STAFFING_CANDIDATE_MANAGE,
+        label: 'Manage candidates & submissions',
+        scoped: true,
+      },
+    ],
+  },
+  {
+    heading: 'Commercials',
+    permissions: [
+      {
+        permission: PERMISSIONS.COMMERCIAL_MANAGE,
+        label: 'Contracts, quotations, invoices',
+        scoped: true,
+      },
+      { permission: PERMISSIONS.COMMERCIAL_PAYMENT, label: 'Record payments', scoped: true },
+    ],
+  },
+  {
+    heading: 'Reporting',
+    permissions: [
+      { permission: PERMISSIONS.REPORT_VIEW, label: 'All other reports', scoped: true },
+      { permission: PERMISSIONS.REPORT_REVENUE, label: 'View revenue KPIs', scoped: true },
+      {
+        permission: PERMISSIONS.REPORT_PERFORMANCE,
+        label: 'BDE / BDM performance reports',
+        scoped: true,
+      },
+      { permission: PERMISSIONS.DATA_EXPORT, label: 'Export data', scoped: true },
+    ],
+  },
+  {
+    heading: 'Administration',
+    permissions: [
+      { permission: PERMISSIONS.ADMIN_USERS, label: 'Manage users & teams' },
+      { permission: PERMISSIONS.ADMIN_MASTER, label: 'Manage master data' },
+      { permission: PERMISSIONS.ADMIN_AUDIT, label: 'View audit log' },
+    ],
+  },
+]
+
 const BDE_PERMISSIONS: Permission[] = [
   PERMISSIONS.LEAD_CREATE,
   PERMISSIONS.LEAD_VIEW,

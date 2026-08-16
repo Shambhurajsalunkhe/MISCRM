@@ -185,6 +185,27 @@ enum EntityType {
   PAYMENT
   USER
   PROSPECTING_ACTIVITY
+
+  // Organisation and master data. Added in Phase 1: the audit writer runs at
+  // the ORM layer (src/lib/audit/), and every table an administrator can edit
+  // needs a name here or its changes would be silently unrecorded.
+  TEAM
+  DEPARTMENT
+  ROLE_PERMISSION
+  SALES_VERTICAL
+  PIPELINE_STAGE
+  VERTICAL_METRIC
+  REQUIREMENT_STAGE
+  CANDIDATE_STAGE
+  REQUIREMENT_TYPE
+  LEAD_SOURCE
+  LOST_REASON
+  SERVICE
+  PRODUCT
+  COUNTRY
+  TAG
+  APP_SETTING
+  EMAIL_TEMPLATE
 }
 
 enum NotificationType {
@@ -503,6 +524,10 @@ model Tag {
   id       String  @id @default(cuid())
   name     String  @unique
   colorHex String?
+  /// Added in Phase 1. Every other master list deactivates rather than
+  /// deletes (open question Q10), and a tag already applied to leads cannot be
+  /// removed without rewriting history.
+  isActive Boolean @default(true)
 
   leads LeadTag[]
 }

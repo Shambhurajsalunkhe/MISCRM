@@ -5,14 +5,7 @@ import { can } from '@/lib/authz'
 import { NAVIGATION, type NavSection } from '@/lib/navigation'
 import { SidebarNav } from '@/components/sidebar-nav'
 import { logoutAction } from '@/app/login/actions'
-
-const ROLE_LABELS: Record<string, string> = {
-  ADMIN: 'Administrator',
-  SALES_HEAD: 'Sales Head',
-  MANAGER: 'Manager',
-  BDM: 'BDM',
-  BDE: 'BDE',
-}
+import { ROLE_LABELS } from '@/lib/roles'
 
 export default async function AppLayout({
   children,
@@ -53,7 +46,7 @@ export default async function AppLayout({
             {user.name}
           </p>
           <p className="truncate px-2 text-xs text-slate-400">
-            {ROLE_LABELS[user.role] ?? user.role}
+            {ROLE_LABELS[user.role]}
           </p>
           <form action={logoutAction} className="mt-2">
             <button

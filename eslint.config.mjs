@@ -18,7 +18,24 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "src/generated/**",
     ],
+  },
+  {
+    rules: {
+      // Server actions are called by `useActionState` with a fixed
+      // (previousState, formData) signature, so an action that ignores one of
+      // them still has to declare it. The `_` prefix is how the codebase marks
+      // that as deliberate.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
   },
 ];
 

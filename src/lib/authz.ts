@@ -54,3 +54,35 @@ export async function requirePermission(
 
   return user
 }
+
+/**
+ * Guard for a *page*, which wants to render an explanation rather than throw.
+ *
+ * Returns `null` when the signed-in user lacks the capability, so the page can
+ * render `<AccessDenied />`. Pages get this instead of `requirePermission`
+ * because a 500 error page is the wrong answer to "you may not see this", and
+ * a 404 is the wrong answer for an internal tool where the screen demonstrably
+ * exists — the user just isn't the one who administers it.
+ *
+ * This is only a second line of defence. The sidebar and the admin sub-nav
+ * already hide links a user cannot follow; this covers someone typing the URL.
+ * Mutations are guarded independently in the server actions, so a page that
+ * forgets this check still cannot be used to change anything.
+ */
+export async function pageAccess(
+  permission: Permission,
+): Promise<CurrentUser | null> {
+  const user = await requireUser()
+  return (await can(user, permission)) ? user : null
+}
+
+/** True if the user holds at least one of the given capabilities. */
+export async function canAny(
+  user: CurrentUser,
+  permissions: Permission[],
+): Promise<boolean> {
+  for (const permission of permissions) {
+    if (await can(user, permission)) return true
+  }
+  return false
+}

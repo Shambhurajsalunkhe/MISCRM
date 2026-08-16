@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { createSession, destroySession } from '@/lib/auth/session'
+import { recordAudit } from '@/lib/audit/record'
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().min(3),
@@ -89,6 +90,17 @@ export async function loginAction(
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLoginAt: new Date() },
+  })
+
+  // Explicit, because the ORM-layer writer only sees row changes and
+  // `lastLoginAt` is deliberately ignored there — otherwise every sign-in
+  // would produce a field-diff row saying a timestamp moved, which buries the
+  // sign-in itself.
+  await recordAudit({
+    entityType: 'USER',
+    entityId: user.id,
+    action: 'LOGIN',
+    userId: user.id,
   })
 
   await createSession({
