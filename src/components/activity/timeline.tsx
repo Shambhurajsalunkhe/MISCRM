@@ -35,13 +35,18 @@ export function Timeline({
     return <EmptyState>Nothing logged yet.</EmptyState>
   }
 
-  const now = Date.now()
+  // Compared against the start of today, not the current instant. Follow-up
+  // dates are date-only, so they land at midnight — measuring from `now` marked
+  // everything due today as already overdue from 00:01 onwards, which is both
+  // wrong and the opposite of reassuring first thing in the morning.
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
 
   return (
     <ol className="space-y-3">
       {entries.map((entry) => {
         const overdue =
-          entry.followUpDate && entry.followUpDate.getTime() < now
+          entry.followUpDate && entry.followUpDate < startOfToday
 
         return (
           <li

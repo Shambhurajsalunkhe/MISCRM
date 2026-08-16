@@ -69,6 +69,38 @@ export function isAllowedMimeType(mimeType: string): boolean {
 }
 
 /**
+ * Extensions matching the MIME allow-list.
+ *
+ * Checked *as well as* the MIME type, because the type is whatever the browser
+ * chose to send and a caller can send anything: a `.html` file declared as
+ * `image/png` passes the MIME check on its own. Downloads are always served as
+ * an attachment with `nosniff`, so this is the second of two locks rather than
+ * the only one.
+ */
+const ALLOWED_EXTENSIONS = new Set([
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.txt',
+  '.csv',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.zip',
+])
+
+export function isAllowedExtension(fileName: string): boolean {
+  const extension = path.extname(fileName).toLowerCase()
+  return extension !== '' && ALLOWED_EXTENSIONS.has(extension)
+}
+
+/**
  * Strip a client-supplied filename down to something safe to display and to
  * echo in a `Content-Disposition` header.
  *
@@ -107,8 +139,21 @@ function resolveKey(storageKey: string): string {
  * neither can guess the other's key.
  */
 export async function store(file: File): Promise<StoredFile> {
-  const bytes = Buffer.from(await file.arrayBuffer())
   const fileName = safeFileName(file.name)
+
+  // Re-checked here, not only in the calling action. `arrayBuffer()` pulls the
+  // whole file into memory, so an oversized upload has to be refused *before*
+  // that line rather than after it — and a second call site added in a later
+  // phase (resumes in Phase 4, the importer in Phase 7) inherits the checks
+  // instead of having to remember them.
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error(`File exceeds the ${MAX_UPLOAD_BYTES} byte limit.`)
+  }
+  if (!isAllowedMimeType(file.type) || !isAllowedExtension(fileName)) {
+    throw new Error(`File type not accepted: ${file.type || 'unknown'}`)
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer())
   const extension = path.extname(fileName).slice(0, 10).toLowerCase()
 
   const now = new Date()

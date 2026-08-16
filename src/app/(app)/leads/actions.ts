@@ -24,6 +24,7 @@ import {
   optionalId,
   optionalMoney,
   optionalText,
+  optionalUrl,
 } from '@/lib/form-fields'
 import {
   actionError,
@@ -55,7 +56,7 @@ const leadSchema = z.object({
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
   additionalNotes: optionalText(4000),
   campaignName: optionalText(200),
-  referenceUrl: optionalText(500),
+  referenceUrl: optionalUrl(500),
   expectedCloseDate: optionalDate,
   nextFollowUpAt: optionalDate,
   generatedById: optionalId,
@@ -65,7 +66,7 @@ const leadSchema = z.object({
 /** Creating a lead against a company that is not on file yet. */
 const newClientSchema = z.object({
   companyName: z.string().trim().min(2, 'Enter the company name.').max(200),
-  website: optionalText(300),
+  website: optionalUrl(300),
   countryId: optionalId,
   contactName: optionalText(120),
   contactEmail: optionalText(200),
@@ -535,6 +536,9 @@ export async function deleteLeadAction(
     })
 
     revalidatePath('/leads')
+    // The detail page too: without this, anyone still holding /leads/<id> open
+    // keeps seeing a cached copy of a lead that no longer appears in any list.
+    revalidatePath(`/leads/${id}`)
     return actionSuccess(
       `${lead.leadCode} deleted. Its history is intact and an administrator can restore it.`,
     )

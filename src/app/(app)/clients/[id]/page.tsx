@@ -11,6 +11,7 @@ import { AccessDenied } from '@/components/access-denied'
 import { ButtonLink } from '@/components/ui/button'
 import { ActiveBadge, Badge } from '@/components/ui/badge'
 import { Card, PageHeader, EmptyState } from '@/components/ui/page'
+import { ExternalLink } from '@/components/ui/external-link'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { ActiveToggle } from '@/components/active-toggle'
 import { ActivityForm } from '@/components/activity/activity-form'
@@ -155,18 +156,10 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
             </Detail>
             <Detail label="Owner">{client.owner?.name ?? 'Unassigned'}</Detail>
             <Detail label="Website">
-              {client.website ? (
-                <ExternalLink href={client.website} />
-              ) : (
-                '—'
-              )}
+              <ExternalLink href={client.website} />
             </Detail>
             <Detail label="LinkedIn">
-              {client.companyLinkedIn ? (
-                <ExternalLink href={client.companyLinkedIn} />
-              ) : (
-                '—'
-              )}
+              <ExternalLink href={client.companyLinkedIn} />
             </Detail>
             <Detail label="Address">{client.address ?? '—'}</Detail>
             <Detail label="On file since">{formatDate(client.createdAt)}</Detail>
@@ -340,21 +333,3 @@ function Detail({
   )
 }
 
-/**
- * `noreferrer` as well as `noopener`: these URLs are typed by users, and the
- * destination has no business learning which lead the click came from.
- */
-function ExternalLink({ href }: { href: string }) {
-  const url = href.includes('://') ? href : `https://${href}`
-
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer noopener"
-      className="text-slate-700 underline hover:text-slate-900"
-    >
-      {href}
-    </a>
-  )
-}

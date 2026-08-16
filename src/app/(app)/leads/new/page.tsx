@@ -119,9 +119,37 @@ export default async function NewLeadPage({
     ])
 
   const truncated = clients.length > CLIENT_PICKER_LIMIT
+  const capped = clients.slice(0, CLIENT_PICKER_LIMIT)
 
-  const clientOptions: LeadFormClient[] = clients
-    .slice(0, CLIENT_PICKER_LIMIT)
+  // "New lead" on a client page arrives with `?clientId=`. If that account is
+  // older than the most recent 500 it falls outside the query above, and the
+  // pre-selection was silently dropped — leaving the user on a blank picker
+  // with no hint that the button had done anything. Fetch it separately, under
+  // the same visibility and active constraints, and add it to the list.
+  if (clientId && !capped.some((client) => client.id === clientId)) {
+    const requested = await prisma.client.findFirst({
+      where: {
+        id: clientId,
+        isDeleted: false,
+        isActive: true,
+        ...(await clientVisibilityFilter(viewer)),
+      },
+      select: {
+        id: true,
+        clientCode: true,
+        companyName: true,
+        contacts: {
+          where: { isActive: true },
+          orderBy: [{ isPrimary: 'desc' }, { name: 'asc' }],
+          select: { id: true, name: true, designation: true, isPrimary: true },
+        },
+      },
+    })
+
+    if (requested) capped.push(requested)
+  }
+
+  const clientOptions: LeadFormClient[] = capped
     .map((client) => ({
       id: client.id,
       label: `${client.companyName} · ${client.clientCode}`,

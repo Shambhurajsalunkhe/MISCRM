@@ -18,6 +18,24 @@ export type LeadFormClient = {
   contacts: Array<{ id: string; label: string; isPrimary: boolean }>
 }
 
+/**
+ * Has the user typed anything worth warning them about losing?
+ *
+ * Only text-like inputs count. Selects and checkboxes carry a default the user
+ * may never have touched, and treating those as "content" would put a
+ * confirmation dialog in front of someone who has done nothing but open the
+ * page and pick a vertical.
+ */
+function hasTypedContent(form: HTMLFormElement | null): boolean {
+  if (!form) return false
+
+  return Array.from(
+    form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+      'input[type="text"], input[type="email"], input[type="date"], input:not([type]), textarea',
+    ),
+  ).some((field) => field.value.trim() !== '')
+}
+
 export type LeadFormOptions = {
   verticals: Array<{ id: string; name: string }>
   sources: Array<{ id: string; name: string }>
@@ -77,6 +95,19 @@ export function LeadForm({
             id="vertical-picker"
             value={verticalId}
             onChange={(event) => {
+              // Switching vertical reloads the page, which discards anything
+              // already typed. Cheap to do by accident on a select, and
+              // expensive when the requirement description is three paragraphs
+              // in — so ask first, and only when there is something to lose.
+              if (
+                hasTypedContent(event.currentTarget.form) &&
+                !window.confirm(
+                  'Changing the vertical reloads the form and clears what you have entered. Continue?',
+                )
+              ) {
+                return
+              }
+
               const next = new URLSearchParams({ vertical: event.target.value })
               if (clientId) next.set('clientId', clientId)
               router.push(`/leads/new?${next.toString()}`)

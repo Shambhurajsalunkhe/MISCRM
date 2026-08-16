@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { prisma, type TransactionClient } from '@/lib/db'
+import type { TransactionClient } from '@/lib/db'
 
 /**
  * Record codes — `UP-0001` for leads, `CL-0001` for clients (README §5).
@@ -91,25 +91,10 @@ export function nextClientCode(tx: TransactionClient): Promise<string> {
   return nextSequenceCode(tx, 'client', 'CL')
 }
 
-/**
- * Seed `NumberSequence` past any codes that already exist.
- *
- * Only relevant to a database that gained clients before this counter did — the
- * importer in Phase 7 will want the same treatment. Cheap to call and a no-op
- * once the counter is ahead.
- */
-export async function syncClientSequence(): Promise<void> {
-  const existing = await prisma.numberSequence.findUnique({
-    where: { key: 'client' },
-    select: { lastNumber: true },
-  })
-
-  const clients = await prisma.client.count()
-  if (existing && existing.lastNumber >= clients) return
-
-  await prisma.numberSequence.upsert({
-    where: { key: 'client' },
-    create: { key: 'client', lastNumber: clients },
-    update: { lastNumber: clients },
-  })
-}
+// A `syncClientSequence` helper lived here to fast-forward the counter past
+// pre-existing clients. It was never called, and it read-then-wrote without a
+// transaction, so two callers could have moved the counter *backwards* and
+// started re-issuing codes that already existed. Removed rather than fixed:
+// the CSV importer in Phase 7 is the first thing that will genuinely need it,
+// and it should be written then, against that use, as a single conditional
+// `updateMany` that can only ever move the counter forward.

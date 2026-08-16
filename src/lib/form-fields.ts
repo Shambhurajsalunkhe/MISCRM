@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { isSafeExternalUrl } from '@/lib/safe-url'
+
 /**
  * Zod builders for optional fields arriving from a `<form>`.
  *
@@ -54,12 +56,49 @@ export const optionalMoney = absentAsBlank
     'Enter an amount, or leave it blank.',
   )
 
-/** `<input type="date">` and `datetime-local` both arrive as strings. */
+/**
+ * `<input type="date">` and `datetime-local` both arrive as strings.
+ *
+ * A bare `yyyy-MM-dd` must be built from its parts rather than handed to
+ * `new Date()`, which reads it as **UTC** midnight. Stored that way, a
+ * follow-up date set for the 16th is 15 Aug 19:00 local at UTC-5, so it renders
+ * and filters as the previous day. `datetime-local` values already carry a time
+ * and are parsed as local by `Date`, so they stay on the normal path.
+ */
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function parseFormDate(value: string): Date {
+  const match = DATE_ONLY.exec(value)
+  if (!match) return new Date(value)
+
+  const [year, month, day] = match.slice(1).map(Number)
+  const date = new Date(year, month - 1, day)
+
+  // Rejects 31 February, which `Date` would otherwise roll into March.
+  return date.getMonth() === month - 1 && date.getDate() === day
+    ? date
+    : new Date(Number.NaN)
+}
+
 export const optionalDate = absentAsBlank
-  .transform((value) => (value === '' ? null : new Date(value)))
+  .transform((value) => (value === '' ? null : parseFormDate(value)))
   .refine(
     (value) => value === null || !Number.isNaN(value.getTime()),
     'Enter a valid date.',
+  )
+
+/**
+ * A web address typed by a user.
+ *
+ * Rejects anything that is not http(s) at the point of storage, so a
+ * `javascript:` payload never reaches the database. Rendering guards against it
+ * again — see `src/lib/safe-url.ts` — because defence at one layer is defence
+ * until someone adds a second read path.
+ */
+export const optionalUrl = (max: number) =>
+  optionalText(max).refine(
+    (value) => isSafeExternalUrl(value),
+    'Enter a web address starting with http:// or https://.',
   )
 
 export const optionalEmail = absentAsBlank

@@ -192,7 +192,10 @@ export default async function ClientsPage({
 
       {clients.length === 0 ? (
         <EmptyState>
-          {total === 0 && !search
+          {/* "No clients yet" is only true when nothing is narrowing the list.
+              Checking `search` alone told someone filtering by country that the
+              database was empty. */}
+          {total === 0 && !search && !country && !owner && !status
             ? 'No clients yet. Add one, or create a lead — the lead form can create the client with it.'
             : 'No clients match these filters.'}
         </EmptyState>

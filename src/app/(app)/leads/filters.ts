@@ -182,6 +182,11 @@ export async function leadWhere(user: CurrentUser, filters: LeadFilters) {
       ? { nextFollowUpAt: { lt: now }, status: 'OPEN' as const }
       : filters.follow === 'today'
         ? {
+            // OPEN as well, matching the other two follow-up filters: chasing a
+            // deal that is already won or lost is not a follow-up, and leaving
+            // it out made "due today" the only one of the three that listed
+            // closed leads.
+            status: 'OPEN' as const,
             nextFollowUpAt: {
               gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
               lte: new Date(

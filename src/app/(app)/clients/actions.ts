@@ -20,6 +20,7 @@ import {
   optionalEmail,
   optionalId,
   optionalText,
+  optionalUrl,
 } from '@/lib/form-fields'
 import { clientVisibilityFilter } from '@/lib/visibility'
 import {
@@ -36,8 +37,8 @@ import type { CurrentUser } from '@/lib/auth/session'
 
 const clientSchema = z.object({
   companyName: z.string().trim().min(2, 'Enter the company name.').max(200),
-  website: optionalText(300),
-  companyLinkedIn: optionalText(300),
+  website: optionalUrl(300),
+  companyLinkedIn: optionalUrl(300),
   industry: optionalText(120),
   countryId: optionalId,
   city: optionalText(120),
@@ -51,7 +52,7 @@ const primaryContactSchema = z.object({
   contactDesignation: optionalText(120),
   contactEmail: optionalEmail,
   contactPhone: optionalText(60),
-  contactLinkedIn: optionalText(300),
+  contactLinkedIn: optionalUrl(300),
 })
 
 const contactSchema = z.object({
@@ -59,7 +60,7 @@ const contactSchema = z.object({
   designation: optionalText(120),
   email: optionalEmail,
   phone: optionalText(60),
-  linkedInProfile: optionalText(300),
+  linkedInProfile: optionalUrl(300),
 })
 
 /**
@@ -404,9 +405,17 @@ export async function setContactActiveAction(
 
     // A deactivated primary contact would still be the one every lead form
     // pre-selects, so the flag comes off with the activation.
-    await prisma.clientContact.update({
-      where: { id },
-      data: { isActive, ...(isActive ? {} : { isPrimary: false }) },
+    //
+    // Transactional and followed by `refreshDedupeKey`, because the key is
+    // derived from the *active* primary contact's email domain — deactivating
+    // them silently changes which address the company is identified by, and a
+    // stale key stops catching the duplicates it exists to catch.
+    await auditedTransaction(async (tx) => {
+      await tx.clientContact.update({
+        where: { id },
+        data: { isActive, ...(isActive ? {} : { isPrimary: false }) },
+      })
+      await refreshDedupeKey(tx, contact.clientId)
     })
 
     revalidatePath(`/clients/${contact.clientId}`)

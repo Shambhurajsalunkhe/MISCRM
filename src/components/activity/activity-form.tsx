@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Field, Input, Select, Textarea } from '@/components/ui/field'
@@ -28,7 +28,19 @@ export function ActivityForm({
 }) {
   const [state, formAction] = useActionState(logActivityAction, IDLE)
   const [open, setOpen] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
   const errors = state.fieldErrors ?? {}
+
+  // Close and clear once the activity is logged. Left open, the form kept the
+  // previous entry's text, so the obvious next action — log another call —
+  // started from a filled-in form that looked like it had already been
+  // submitted, and pressing the button again posted a duplicate.
+  useEffect(() => {
+    if (state.status === 'success') {
+      formRef.current?.reset()
+      setOpen(false)
+    }
+  }, [state])
 
   if (!open) {
     return (
@@ -40,6 +52,7 @@ export function ActivityForm({
 
   return (
     <form
+      ref={formRef}
       action={formAction}
       className="space-y-3 rounded-md border border-slate-200 bg-slate-50/60 p-3"
     >

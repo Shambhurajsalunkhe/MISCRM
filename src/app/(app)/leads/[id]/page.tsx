@@ -5,6 +5,7 @@ import { currencySymbol } from '@/lib/settings'
 import { formatDate, formatMoney } from '@/lib/format'
 import { PRIORITY_LABELS } from '@/lib/leads/display'
 import { Card } from '@/components/ui/page'
+import { ExternalLink } from '@/components/ui/external-link'
 import { RowAction } from '@/components/row-action'
 import { loadLead } from './lead'
 import { deleteLeadAction } from '../actions'
@@ -101,22 +102,7 @@ export default async function LeadOverviewPage({ params }: { params: Params }) {
         <dl className="space-y-2 text-sm">
           <Fact label="Campaign">{lead.campaignName ?? '—'}</Fact>
           <Fact label="Reference">
-            {lead.referenceUrl ? (
-              <a
-                href={
-                  lead.referenceUrl.includes('://')
-                    ? lead.referenceUrl
-                    : `https://${lead.referenceUrl}`
-                }
-                target="_blank"
-                rel="noreferrer noopener"
-                className="break-all text-slate-800 underline hover:text-slate-900"
-              >
-                {lead.referenceUrl}
-              </a>
-            ) : (
-              '—'
-            )}
+            <ExternalLink href={lead.referenceUrl} />
           </Fact>
           <Fact label="Notes">
             {lead.additionalNotes ? (

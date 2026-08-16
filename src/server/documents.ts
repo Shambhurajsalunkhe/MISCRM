@@ -8,9 +8,11 @@ import { can } from '@/lib/authz'
 import { PERMISSIONS } from '@/lib/permissions'
 import { resolveTarget, targetFromFormData } from '@/lib/attachments'
 import {
+  isAllowedExtension,
   isAllowedMimeType,
   MAX_UPLOAD_BYTES,
   remove,
+  safeFileName,
   store,
 } from '@/lib/storage'
 import {
@@ -49,7 +51,10 @@ export async function uploadDocumentAction(
       })
     }
 
-    if (!isAllowedMimeType(file.type)) {
+    // Both the declared type and the extension, since the type is whatever the
+    // browser chose to send: an .html file announced as image/png would pass
+    // the first check alone.
+    if (!isAllowedMimeType(file.type) || !isAllowedExtension(safeFileName(file.name))) {
       return actionError('That file type is not accepted.', {
         file: 'Documents, spreadsheets, presentations, images, text and zip files only.',
       })
@@ -131,7 +136,20 @@ export async function deleteDocumentAction(
     // Row first. A deleted row with an orphaned file wastes disk; a deleted
     // file with a live row is a download that 500s for everyone who tries it.
     await prisma.document.delete({ where: { id } })
-    await remove(document.storageKey)
+
+    // The row is already gone, so the user's request has succeeded whatever
+    // happens next. Letting a storage error propagate here would report a
+    // failure for a deletion that did in fact happen, and the retry would then
+    // fail on the missing row. Log the key instead, for reconciliation.
+    try {
+      await remove(document.storageKey)
+    } catch (error) {
+      console.error(
+        '[documents] row deleted but file remains',
+        document.storageKey,
+        error,
+      )
+    }
 
     revalidatePath(resolved.path)
     return actionSuccess(`${document.fileName} removed.`)
