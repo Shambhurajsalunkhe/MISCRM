@@ -1,6 +1,6 @@
 # Data Model
 
-Executable schema: [`prisma/schema.prisma`](../prisma/schema.prisma) — 46 models.
+Executable schema: [`prisma/schema.prisma`](../prisma/schema.prisma) — 47 models.
 This document explains the shape and the reasoning.
 
 ---
@@ -65,6 +65,12 @@ remembering to set a second field.
 `LeadSequence` is keyed on `(verticalId, year)` and incremented inside the same
 transaction that inserts the lead, using `UPDATE … RETURNING`. That gives
 gap-free `UP-0001`, `ST-0042` codes with no race between concurrent BDEs.
+
+Codes that are neither per-vertical nor per-year — `CL-0001` for clients, and
+`REQ-`/`INV-` later — come from `NumberSequence`, a generic `key → lastNumber`
+counter allocated the same way. Both are issued through `src/lib/codes.ts`,
+always inside the caller's transaction: a code allocated outside the insert it
+belongs to survives a rollback and shows up later as an unexplained gap.
 
 ### De-duplication
 
@@ -187,6 +193,12 @@ SELECT id FROM subtree;
 This is applied server-side in a single shared helper, never assembled per
 endpoint — visibility bugs in a CRM are the kind that get noticed by the wrong
 person.
+
+**Clients are scoped slightly wider than leads.** A client is visible to its
+owner *and* to anyone who can see one of its leads: a BDE who sourced `UP-0042`
+has to be able to open the account page to add the contact they just spoke to.
+An unowned client with no leads is therefore visible only to Sales Head and
+Admin, which is the right default and is fixed by setting an owner.
 
 ---
 

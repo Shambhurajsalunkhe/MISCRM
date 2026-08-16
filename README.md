@@ -70,5 +70,11 @@ so `npm run db:generate` is required after a fresh clone.
 | Phase | State |
 |---|---|
 | 0 — Foundation: auth, RBAC, visibility, app shell | Complete |
-| 1 — Org and master data | Data layer and seed complete; admin screens pending |
-| 2–8 | Not started — see the implementation plan |
+| 1 — Org and master data | Complete |
+| 2 — Clients, leads, the stage engine and search | Complete |
+| 3–8 | Not started — see the implementation plan |
+
+Uploaded documents are written to `storage/uploads/`, outside `public/` and
+git-ignored, and are served only through `/api/documents/[id]` after the same
+visibility check the lead itself gets. See `src/lib/storage.ts` to point this at
+S3 instead.

@@ -1,0 +1,459 @@
+'use client'
+
+import { useActionState, useState } from 'react'
+import { useRouter } from 'next/navigation'
+
+import { ButtonLink } from '@/components/ui/button'
+import { Field, Input, Select, Textarea } from '@/components/ui/field'
+import { FormMessage, SubmitButton, WarningList } from '@/components/ui/form'
+import { Card } from '@/components/ui/page'
+import { PRIORITY_LABELS, PRIORITY_ORDER } from '@/lib/leads/display'
+import type { LeadFormLayout } from '@/lib/leads/vertical-form'
+import { IDLE } from '@/lib/form'
+import { createLeadAction } from '../actions'
+
+export type LeadFormClient = {
+  id: string
+  label: string
+  contacts: Array<{ id: string; label: string; isPrimary: boolean }>
+}
+
+export type LeadFormOptions = {
+  verticals: Array<{ id: string; name: string }>
+  sources: Array<{ id: string; name: string }>
+  services: Array<{ id: string; name: string }>
+  products: Array<{ id: string; name: string }>
+  countries: Array<{ id: string; name: string }>
+  users: Array<{ id: string; name: string; roleLabel: string }>
+  clients: LeadFormClient[]
+  /** True when the client list was capped — see the hint under the picker. */
+  clientsTruncated: boolean
+}
+
+/**
+ * The lead creation form (README §6).
+ *
+ * The vertical picker navigates rather than switching sections client-side: the
+ * stage list, sources and lost reasons are all per-vertical, so the sections
+ * that change are the ones whose *contents* come from the database. Re-rendering
+ * on the server is both simpler and correct, and it puts the choice in the URL
+ * so `/leads/new?vertical=…` is linkable.
+ */
+export function LeadForm({
+  layout,
+  verticalId,
+  options,
+  defaultClientId,
+}: {
+  layout: LeadFormLayout
+  verticalId: string
+  options: LeadFormOptions
+  defaultClientId?: string
+}) {
+  const router = useRouter()
+  const [state, formAction] = useActionState(createLeadAction, IDLE)
+  const errors = state.fieldErrors ?? {}
+
+  const [clientId, setClientId] = useState(defaultClientId ?? '')
+  const [newCompany, setNewCompany] = useState(false)
+  const needsOverride = (state.warnings?.length ?? 0) > 0
+
+  const contacts =
+    options.clients.find((client) => client.id === clientId)?.contacts ?? []
+
+  return (
+    <form action={formAction} className="space-y-4">
+      <input type="hidden" name="verticalId" value={verticalId} />
+
+      <FormMessage state={state} />
+      <WarningList state={state} />
+
+      <Card
+        title="Vertical"
+        description="Decides the lead code prefix, the stage list this lead follows and which modules it exposes. It cannot be changed afterwards — its stage history would no longer line up."
+      >
+        <Field label="Vertical" htmlFor="vertical-picker" required>
+          <Select
+            id="vertical-picker"
+            value={verticalId}
+            onChange={(event) => {
+              const next = new URLSearchParams({ vertical: event.target.value })
+              if (clientId) next.set('clientId', clientId)
+              router.push(`/leads/new?${next.toString()}`)
+            }}
+          >
+            {options.verticals.map((vertical) => (
+              <option key={vertical.id} value={vertical.id}>
+                {vertical.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        {layout.afterCreateNote ? (
+          <p className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+            {layout.afterCreateNote}
+          </p>
+        ) : null}
+      </Card>
+
+      <Card
+        title="Client"
+        description="A returning customer gets a new lead against the account we already have, never a second company record."
+      >
+        {newCompany ? (
+          <div className="space-y-4">
+            {needsOverride ? (
+              <Field
+                label="Create it anyway — why is this a separate company?"
+                htmlFor="overrideReason"
+                hint="Recorded in the audit trail."
+                required
+              >
+                <Input
+                  id="overrideReason"
+                  name="overrideReason"
+                  placeholder="e.g. different subsidiary, separate billing entity"
+                  required
+                />
+              </Field>
+            ) : null}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Company name"
+                htmlFor="companyName"
+                error={errors.companyName}
+                required
+              >
+                <Input
+                  id="companyName"
+                  name="companyName"
+                  aria-invalid={Boolean(errors.companyName)}
+                  required
+                />
+              </Field>
+
+              <Field label="Website" htmlFor="website" error={errors.website}>
+                <Input id="website" name="website" placeholder="acme.com" />
+              </Field>
+
+              <Field label="Country" htmlFor="countryId">
+                <Select id="countryId" name="countryId" defaultValue="">
+                  <option value="">Not set</option>
+                  {options.countries.map((country) => (
+                    <option key={country.id} value={country.id}>
+                      {country.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field
+                label="Contact name"
+                htmlFor="contactName"
+                error={errors.contactName}
+              >
+                <Input id="contactName" name="contactName" />
+              </Field>
+
+              <Field
+                label="Contact email"
+                htmlFor="contactEmail"
+                error={errors.contactEmail}
+              >
+                <Input id="contactEmail" name="contactEmail" type="email" />
+              </Field>
+
+              <Field
+                label="Contact phone"
+                htmlFor="contactPhone"
+                error={errors.contactPhone}
+              >
+                <Input id="contactPhone" name="contactPhone" />
+              </Field>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setNewCompany(false)}
+              className="text-sm text-slate-600 underline hover:text-slate-900"
+            >
+              Pick an existing client instead
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Client"
+                htmlFor="clientId"
+                error={errors.clientId}
+                hint={
+                  options.clientsTruncated
+                    ? 'Showing the most recent clients. If yours is missing, open it from Clients and use “New lead” there.'
+                    : undefined
+                }
+                required
+              >
+                <Select
+                  id="clientId"
+                  name="clientId"
+                  value={clientId}
+                  onChange={(event) => setClientId(event.target.value)}
+                  required
+                >
+                  <option value="">Choose a client</option>
+                  {options.clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field
+                label="Primary contact"
+                htmlFor="primaryContactId"
+                error={errors.primaryContactId}
+                hint={
+                  clientId && contacts.length === 0
+                    ? 'This client has no active contacts yet. Add one from the client page.'
+                    : undefined
+                }
+              >
+                <Select
+                  id="primaryContactId"
+                  name="primaryContactId"
+                  defaultValue={
+                    contacts.find((contact) => contact.isPrimary)?.id ?? ''
+                  }
+                  disabled={contacts.length === 0}
+                  // Remount when the client changes, so the browser re-applies
+                  // `defaultValue` instead of keeping the previous client's
+                  // contact selected.
+                  key={clientId}
+                >
+                  <option value="">Not set</option>
+                  {contacts.map((contact) => (
+                    <option key={contact.id} value={contact.id}>
+                      {contact.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setNewCompany(true)
+                setClientId('')
+              }}
+              className="text-sm text-slate-600 underline hover:text-slate-900"
+            >
+              This company is not on file yet
+            </button>
+          </div>
+        )}
+      </Card>
+
+      <Card title="Requirement">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Requirement"
+            htmlFor="title"
+            hint="One line, shown everywhere this lead appears in a list."
+            error={errors.title}
+            required
+            className="sm:col-span-2"
+          >
+            <Input
+              id="title"
+              name="title"
+              placeholder="React developer for a 6-month engagement"
+              aria-invalid={Boolean(errors.title)}
+              required
+            />
+          </Field>
+
+          <Field
+            label="Description"
+            htmlFor="requirementDescription"
+            error={errors.requirementDescription}
+            className="sm:col-span-2"
+          >
+            <Textarea id="requirementDescription" name="requirementDescription" />
+          </Field>
+
+          {layout.catalogue === 'product' ? (
+            <Field label="Product" htmlFor="productId">
+              <Select id="productId" name="productId" defaultValue="">
+                <option value="">Not set</option>
+                {options.products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : (
+            <Field label="Service" htmlFor="serviceId">
+              <Select id="serviceId" name="serviceId" defaultValue="">
+                <option value="">Not set</option>
+                {options.services.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          <Field label="Source" htmlFor="sourceId">
+            <Select id="sourceId" name="sourceId" defaultValue="">
+              <option value="">Not set</option>
+              {options.sources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field
+            label="Expected budget"
+            htmlFor="expectedBudget"
+            error={errors.expectedBudget}
+          >
+            <Input id="expectedBudget" name="expectedBudget" inputMode="decimal" />
+          </Field>
+
+          <Field
+            label="Expected timeline"
+            htmlFor="expectedTimeline"
+            error={errors.expectedTimeline}
+          >
+            <Input
+              id="expectedTimeline"
+              name="expectedTimeline"
+              placeholder="6 months"
+            />
+          </Field>
+
+          <Field label="Priority" htmlFor="priority">
+            <Select id="priority" name="priority" defaultValue="MEDIUM">
+              {PRIORITY_ORDER.map((priority) => (
+                <option key={priority} value={priority}>
+                  {PRIORITY_LABELS[priority]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field
+            label="Expected close date"
+            htmlFor="expectedCloseDate"
+            error={errors.expectedCloseDate}
+          >
+            <Input
+              id="expectedCloseDate"
+              name="expectedCloseDate"
+              type="date"
+            />
+          </Field>
+        </div>
+      </Card>
+
+      <Card
+        title="Ownership"
+        description="Who sourced it and who works it are separate on purpose — the BDE and BDM performance reports each read one of them."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Generated by"
+            htmlFor="generatedById"
+            hint="Defaults to you."
+            error={errors.generatedById}
+          >
+            <Select id="generatedById" name="generatedById" defaultValue="">
+              <option value="">You</option>
+              {options.users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name} · {user.roleLabel}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field
+            label="Assigned to"
+            htmlFor="assignedToId"
+            hint="Can be left unassigned and handed over later."
+            error={errors.assignedToId}
+          >
+            <Select id="assignedToId" name="assignedToId" defaultValue="">
+              <option value="">Unassigned</option>
+              {options.users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name} · {user.roleLabel}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      </Card>
+
+      <Card title="Additional information">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {layout.showCampaign ? (
+            <Field
+              label="Campaign name"
+              htmlFor="campaignName"
+              error={errors.campaignName}
+            >
+              <Input id="campaignName" name="campaignName" />
+            </Field>
+          ) : null}
+
+          {layout.reference ? (
+            <Field
+              label={layout.reference.label}
+              htmlFor="referenceUrl"
+              hint={layout.reference.hint}
+              error={errors.referenceUrl}
+            >
+              <Input id="referenceUrl" name="referenceUrl" />
+            </Field>
+          ) : null}
+
+          <Field
+            label="Next follow-up"
+            htmlFor="nextFollowUpAt"
+            error={errors.nextFollowUpAt}
+          >
+            <Input id="nextFollowUpAt" name="nextFollowUpAt" type="date" />
+          </Field>
+
+          <Field
+            label="Notes"
+            htmlFor="additionalNotes"
+            error={errors.additionalNotes}
+            className="sm:col-span-2"
+          >
+            <Textarea id="additionalNotes" name="additionalNotes" />
+          </Field>
+        </div>
+      </Card>
+
+      <div className="flex gap-2">
+        <SubmitButton>
+          {needsOverride ? 'Create anyway' : 'Create lead'}
+        </SubmitButton>
+        <ButtonLink href="/leads" variant="secondary">
+          Cancel
+        </ButtonLink>
+      </div>
+    </form>
+  )
+}

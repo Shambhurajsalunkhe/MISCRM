@@ -1,0 +1,207 @@
+import 'server-only'
+
+import { leadVisibilityFilter } from '@/lib/visibility'
+import { COMMON_STAGE_ORDER, PRIORITY_ORDER } from '@/lib/leads/display'
+import type { CurrentUser } from '@/lib/auth/session'
+import type {
+  CommonStage,
+  LeadStatus,
+  Priority,
+} from '@/generated/prisma/enums'
+
+/**
+ * The lead list's filters, parsed once and reused by the list, the export and
+ * the saved-view writer.
+ *
+ * Filters live in the URL rather than in component state, which is what makes
+ * a filtered list bookmarkable, shareable, back-button-friendly — and what lets
+ * a `SavedView` be nothing more than a stored query string (README §30). It is
+ * also what lets the export produce exactly the rows on screen: it re-parses
+ * the same parameters through the same function rather than reimplementing
+ * them.
+ */
+
+export const LEAD_FILTER_KEYS = [
+  'q',
+  'vertical',
+  'stage',
+  'status',
+  'source',
+  'bde',
+  'bdm',
+  'team',
+  'priority',
+  'from',
+  'to',
+  'follow',
+] as const
+
+export type LeadFilters = Partial<
+  Record<(typeof LEAD_FILTER_KEYS)[number], string>
+>
+
+/** Keep only the keys this list understands, dropping blanks. */
+export function pickLeadFilters(
+  params: Record<string, string | string[] | undefined>,
+): LeadFilters {
+  const filters: LeadFilters = {}
+
+  for (const key of LEAD_FILTER_KEYS) {
+    const value = params[key]
+    const single = Array.isArray(value) ? value[0] : value
+    if (typeof single === 'string' && single.trim() !== '') {
+      filters[key] = single.trim()
+    }
+  }
+
+  return filters
+}
+
+export function leadFilterQuery(filters: LeadFilters): string {
+  const params = new URLSearchParams()
+  for (const key of LEAD_FILTER_KEYS) {
+    const value = filters[key]
+    if (value) params.set(key, value)
+  }
+  return params.toString()
+}
+
+function isOneOf<T extends string>(
+  value: string | undefined,
+  allowed: readonly T[],
+): value is T {
+  return value !== undefined && (allowed as readonly string[]).includes(value)
+}
+
+/**
+ * Split a `<input type="date">` value into its calendar parts.
+ *
+ * Deliberately not `new Date(value)`: a bare `yyyy-MM-dd` is parsed as **UTC**
+ * midnight, and calling `setHours` on the result then works in local time. West
+ * of UTC those two disagree — `new Date('2026-08-16')` is 15 Aug 19:00 local at
+ * UTC-5, so `setHours(0,0,0,0)` lands on 15 Aug and a "from 16 Aug" filter
+ * quietly includes the previous day. Building the date from its parts keeps the
+ * day the user picked. Invisible from IST, which is why it needs the comment.
+ */
+function dayParts(value: string): [number, number, number] | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return null
+
+  const [year, month, day] = match.slice(1).map(Number)
+  const date = new Date(year, month - 1, day)
+
+  // Rejects 31 February and similar, which `Date` would roll over silently.
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null
+  }
+
+  return [year, month, day]
+}
+
+/** Midnight local, so a `from` date includes everything logged that day. */
+function startOfDay(value: string): Date | null {
+  const parts = dayParts(value)
+  return parts ? new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0) : null
+}
+
+/** End of day, for the same reason in the other direction. */
+function endOfDay(value: string): Date | null {
+  const parts = dayParts(value)
+  return parts ? new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999) : null
+}
+
+/**
+ * Build the Prisma `where` for a set of filters, with the user's data scope
+ * already applied.
+ *
+ * Visibility is folded in here rather than left to the caller: this function is
+ * used by three call sites, and one that forgot the scope would be a screen
+ * showing another team's pipeline.
+ */
+export async function leadWhere(user: CurrentUser, filters: LeadFilters) {
+  const now = new Date()
+  const from = filters.from ? startOfDay(filters.from) : null
+  const to = filters.to ? endOfDay(filters.to) : null
+
+  const createdAt =
+    from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } : undefined
+
+  return {
+    isDeleted: false,
+
+    // `AND`, not two spreads. Both the visibility scope and the search term are
+    // disjunctions, so spreading them into one object made the second `OR` key
+    // silently replace the first — and since the visibility scope was written
+    // first, *it* was the one that vanished. The effect was that typing
+    // anything into the search box dropped the data scope entirely and showed
+    // a BDE the whole company's pipeline. Nesting them keeps both.
+    AND: [
+      await leadVisibilityFilter(user),
+      ...(filters.q
+        ? [
+            {
+              OR: [
+                { leadCode: { contains: filters.q, mode: 'insensitive' as const } },
+                { title: { contains: filters.q, mode: 'insensitive' as const } },
+                {
+                  client: {
+                    companyName: {
+                      contains: filters.q,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                },
+              ],
+            },
+          ]
+        : []),
+    ],
+
+    ...(filters.vertical ? { verticalId: filters.vertical } : {}),
+    ...(isOneOf<CommonStage>(filters.stage, COMMON_STAGE_ORDER)
+      ? { commonStage: filters.stage }
+      : {}),
+    ...(isOneOf<Priority>(filters.priority, PRIORITY_ORDER)
+      ? { priority: filters.priority }
+      : {}),
+    ...(filters.source ? { sourceId: filters.source } : {}),
+    ...(filters.bde ? { generatedById: filters.bde } : {}),
+    ...(filters.bdm ? { assignedToId: filters.bdm } : {}),
+    ...(filters.team ? { teamId: filters.team } : {}),
+    ...(createdAt ? { createdAt } : {}),
+
+    // The follow-up queue. `overdue` and `today` are the two questions someone
+    // actually asks of this list first thing in the morning. Both imply an open
+    // lead — chasing a closed one is not a follow-up — hence the default status
+    // below, which an explicit `status` filter still overrides.
+    ...(filters.follow === 'overdue'
+      ? { nextFollowUpAt: { lt: now }, status: 'OPEN' as const }
+      : filters.follow === 'today'
+        ? {
+            nextFollowUpAt: {
+              gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+              lte: new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                23,
+                59,
+                59,
+                999,
+              ),
+            },
+          }
+        : filters.follow === 'none'
+          ? { nextFollowUpAt: null, status: 'OPEN' as const }
+          : {}),
+
+    // Last, so a chosen status wins over the one the follow-up filter implies.
+    ...(isOneOf<LeadStatus>(filters.status, ['OPEN', 'WON', 'LOST'])
+      ? { status: filters.status }
+      : {}),
+  }
+}

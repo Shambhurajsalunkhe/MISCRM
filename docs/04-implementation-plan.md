@@ -87,7 +87,7 @@ Two lockouts are blocked by construction: the last active administrator cannot
 be demoted or deactivated, and `admin.master` / `admin.users` cannot be removed
 from the ADMIN row of the permission matrix.
 
-### Phase 2 — Clients & Leads core
+### Phase 2 — Clients & Leads core — **done**
 Client and contact CRUD with de-duplication. The lead creation form rendering by
 vertical. Lead list with filters, saved views and export. Lead detail with
 Overview / Timeline / Documents / History tabs. The stage engine — transitions
@@ -96,6 +96,54 @@ writing `LeadStageHistory`, updating `commonStage` and `status`, enforcing
 
 *Ends with:* the whole common pipeline works end to end for every vertical.
 This is the phase that de-risks the project.
+
+Delivered: `/clients` (+ `/new`, `/[id]`, `/[id]/edit`), `/leads` (+ `/new`,
+`/[id]` with its four tabs, `/[id]/edit`, `/export`), `/search`, and
+`/api/documents/[id]` for authorised downloads.
+
+**The Phase 1 carry-over is fixed first.** `auditedTransaction` in
+[`src/lib/db.ts`](../src/lib/db.ts) buffers audit rows and flushes them only
+after the transaction commits, and routes the writer's pre-image reads through
+the transaction client. Both halves of the problem the Phase 1 review flagged
+are gone: a rolled-back stage change now leaves no trail, and a row changed
+twice in one transaction is diffed against what the transaction actually did to
+it. Everything multi-row in this phase — issuing a lead code, recording a
+transition, handing a lead over — goes through it.
+
+**Four decisions taken during the build:**
+
+- **`NumberSequence` added**, a generic `key -> lastNumber` counter, because
+  clients need `CL-0001` codes and `LeadSequence` is keyed on
+  `(verticalId, year)`. Folding client codes into it would have meant a nullable
+  year meaning two different things. Phase 4's `REQ-` and Phase 5's `INV-` codes
+  have a table waiting for them.
+- **De-duplication is one hard rule and several soft ones.** `Client.dedupeKey`
+  (normalised company name + email domain) stays a unique constraint with no
+  switch — two rows for one account break every per-client roll-up. Matching
+  contact email, phone, website and LinkedIn only *warn*, and the user saves past
+  them with a reason that is written to the audit trail, which is what
+  [`01-data-model.md`](01-data-model.md) §1 asks for. The key is recomputed
+  whenever the company is renamed or its primary contact changes, so it keeps
+  catching what it exists to catch.
+- **The lead form's vertical sections come from the module switches**, not from
+  a map of the eight verticals — see
+  [`src/lib/leads/vertical-form.ts`](../src/lib/leads/vertical-form.ts). A ninth
+  vertical added in Master Data gets a working form immediately. Only the label
+  on the single free-text URL field is keyed by vertical code, because there is
+  no flag behind "this one is an Upwork job URL".
+- **Documents are served by a route handler, never from `public/`.** A
+  `storageKey` is not a capability: `/api/documents/[id]` re-checks that the
+  reader can see the parent lead, and answers 404 rather than 403 so the
+  existence of a lead outside their scope is not confirmed. Storage itself is
+  local disk behind an interface an S3 adapter drops into — the Q9 emphasis
+  recorded in [`00-decisions.md`](00-decisions.md) §3.
+
+**The two check-then-write races carried from Phase 1 are now fixable.** They
+were blocked on interactive transactions, which now exist —
+`admin/users/actions.ts` and `admin/master/stages/actions.ts` can each be moved
+inside `auditedTransaction`. Neither is on a data path and both are guards
+rather than corruption risks, so they are listed here rather than done in this
+phase.
 
 ### Phase 3 — Prospecting counters & the outbound verticals
 Daily counter entry and the weekly grid. Counter summary screen. Vertical funnel
@@ -154,8 +202,12 @@ all three, because the dashboard aggregates across every vertical.
 
 **Nothing here blocks Phase 2 any more.** On 16 Aug 2026 the proposed default
 was accepted for every open question, so Q1, Q2, Q3, Q9, Q10 and Q11 are
-settled as tabled in [`00-decisions.md`](00-decisions.md) §3 and Phase 2 is
-being built against them.
+settled as tabled in [`00-decisions.md`](00-decisions.md) §3, and Phase 2 was
+built against them. Three are now visible in the running application rather than
+only on paper, which makes them cheaper to look at again: **Q2** is the reason
+field the stage control demands on a backward move, **Q3** is the reassignment
+control in the lead header, and **Q10** is why deleting a lead or a client hides
+it rather than removing it.
 
 Still worth revisiting before the phase that depends on it:
 
@@ -175,20 +227,26 @@ change stage and mark a deal Won. Both are now single toggles in
 `/admin/permissions`, so this is a decision you can make and reverse yourself
 without a deployment.
 
-### Carried into Phase 2 from the Phase 1 review
+### Carried into Phase 3 from the Phase 2 build
 
-- **The audit writer does not participate in interactive transactions.** Its
-  pre-image reads go through the base client and its rows are written
-  immediately, so inside a `prisma.$transaction(...)` the pre-image cannot see
-  uncommitted changes and a rollback leaves the audit rows behind. Nothing in
-  Phase 1 uses an interactive transaction, so the limitation is latent — but
-  Phase 2 issues lead codes and writes stage history transactionally, so this
-  must be fixed first: buffer rows and flush on commit, or pass the transaction
-  client through. See `src/lib/audit/extension.ts`.
-- **Two check-then-write races are accepted for now**, both in guards rather
-  than in data paths: the last-active-administrator check in
-  `admin/users/actions.ts`, and the one-winning-stage-per-vertical check in
-  `admin/master/stages/actions.ts`. Each reads, validates, then writes without
-  a transaction, so two simultaneous administrators could defeat them. Fixing
-  them properly means interactive transactions, which is blocked on the point
-  above.
+- **Neither list paginates.** `/leads` and `/clients` each show the first 100
+  rows and say so in the footer; the filters are how a list is narrowed. That
+  holds at the volumes assumed in Q5 and stops being true if it turns out to be
+  wrong — revisit alongside Q5 before Phase 6, which is where the same query
+  shapes get reused under the dashboard.
+- **The lead form's client picker caps at 500.** Past that, the route in is the
+  client page's own "New lead" button, and the form says so. A typeahead is the
+  real answer, and is worth building once there is a second screen that needs
+  one.
+- **The phone-match duplicate warning is a suffix `contains` scan.** Correct,
+  and unindexable as written. It only runs on create, so it is cheap now; if
+  contacts reach six figures it wants a stored normalised column.
+- **Exports are CSV.** README §29 asks for Excel and PDF as well; those arrive
+  with the reports in Phase 6, where there is enough formatting to justify
+  ExcelJS and React PDF.
+- **The two check-then-write races from Phase 1 are still open**, both guards
+  rather than data paths: the last-active-administrator check in
+  `admin/users/actions.ts` and the one-winning-stage-per-vertical check in
+  `admin/master/stages/actions.ts`. They were blocked on interactive
+  transactions, which Phase 2 built — each is now a matter of moving the body
+  into `auditedTransaction`.

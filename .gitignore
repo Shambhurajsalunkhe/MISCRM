@@ -37,6 +37,9 @@ yarn-error.log*
 # generated Prisma client
 /src/generated
 
+# uploaded documents (local-disk storage adapter — see src/lib/storage.ts)
+/storage
+
 # machine-specific tooling config (WSL distro, mount paths)
 .claude/coderabbit.local.json
 .claude/launch.json

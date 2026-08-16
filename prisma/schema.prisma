@@ -552,6 +552,18 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
+/// Atomic counter for codes that are not per-vertical — `CL-0001` for clients
+/// today, `REQ-`/`INV-` in later phases. Keyed by a caller-chosen string so a
+/// new code family needs no migration.
+///
+/// Separate from `LeadSequence` rather than folded into it: lead codes restart
+/// each year within a vertical (README §5) and these do not, so sharing one
+/// table would mean a nullable year that means two different things.
+model NumberSequence {
+  key        String @id
+  lastNumber Int    @default(0)
+}
+
 /// Atomic per-vertical, per-year counter for UP-0001 style codes (README §5).
 model LeadSequence {
   verticalId String

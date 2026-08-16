@@ -63,6 +63,31 @@ export async function leadVisibilityFilter(user: CurrentUser) {
   }
 }
 
+/**
+ * Clients a user may see.
+ *
+ * Wider than the lead filter on purpose: a client is visible to its owner *and*
+ * to anyone who can see one of its leads. A BDE who sourced `UP-0042` needs the
+ * account page to add the contact they just spoke to, and would otherwise be
+ * able to open the lead but not the company it belongs to.
+ *
+ * A client with no leads and no owner is visible only to Sales Head and Admin.
+ * That is the right default — an account nobody works and nobody owns is not
+ * anyone's to see — and it is fixed by setting an owner.
+ */
+export async function clientVisibilityFilter(user: CurrentUser) {
+  const ids = await visibleUserIds(user)
+  if (ids === null) return {}
+
+  return {
+    OR: [
+      { ownerId: { in: ids } },
+      { leads: { some: { generatedById: { in: ids } } } },
+      { leads: { some: { assignedToId: { in: ids } } } },
+    ],
+  }
+}
+
 /** Same idea for staffing requirements, which are owned by a recruiter/BDM. */
 export async function requirementVisibilityFilter(user: CurrentUser) {
   const ids = await visibleUserIds(user)

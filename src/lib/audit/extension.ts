@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { AuditAction, EntityType } from '@/generated/prisma/enums'
 
-import { currentAuditActor } from '@/lib/audit/context'
+import { currentAuditActor, currentAuditTransaction } from '@/lib/audit/context'
 import { auditedModel, type AuditedModel } from '@/lib/audit/entities'
 
 /**
@@ -24,7 +24,9 @@ import { auditedModel, type AuditedModel } from '@/lib/audit/entities'
  *  3. **It records what actually happened**, not what was requested. Updates
  *     are diffed pre-image against the returned row, so a no-op save writes
  *     nothing and a field the caller set to its existing value is not reported
- *     as a change.
+ *     as a change. Inside an interactive transaction that extends to the
+ *     transaction's own outcome: rows are buffered and only written once it
+ *     commits (see `auditedTransaction` in src/lib/db.ts).
  */
 
 /** Anything with `.findUnique`, `.findMany` and `.create` on each model. */
@@ -43,7 +45,7 @@ type BaseClient = {
   }
 } & Record<string, unknown>
 
-type AuditRow = {
+export type AuditRow = {
   entityType: EntityType
   entityId: string
   action: AuditAction
@@ -169,6 +171,16 @@ export function auditExtensionArgs(client: unknown) {
 
   async function persist(rows: AuditRow[]): Promise<void> {
     if (rows.length === 0) return
+
+    // Inside a transaction the write these rows describe has not committed yet
+    // and may still roll back, so hold them until it does. The buffer is
+    // discarded along with the transaction if it throws — nothing to undo.
+    const transaction = currentAuditTransaction()
+    if (transaction) {
+      transaction.rows.push(...rows)
+      return
+    }
+
     try {
       await base.auditLog.createMany({ data: rows })
     } catch (error) {
@@ -237,7 +249,17 @@ export function auditExtensionArgs(client: unknown) {
             return query(args)
           }
 
-          const delegate = delegateFor(base, model)
+          // Read the pre-image through the transaction when there is one.
+          // Reading through `base` would use a different connection, which
+          // cannot see uncommitted rows — a lead updated twice inside one
+          // transaction would diff its second change against the row as it
+          // stood before the first. Reads are not audited, so going back
+          // through the extended transaction client does not recurse.
+          const transaction = currentAuditTransaction()
+          const delegate = delegateFor(
+            (transaction?.client as BaseClient | undefined) ?? base,
+            model,
+          )
 
           // --- Pre-image ------------------------------------------------------
           // Read before the write, because after a delete there is nothing left

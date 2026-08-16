@@ -10,6 +10,14 @@ export type ActionState = {
   status: 'idle' | 'success' | 'error'
   message?: string
   fieldErrors?: Record<string, string>
+  /**
+   * Things the user should read before deciding, rather than things they got
+   * wrong. Duplicate detection is the case this exists for: a matching contact
+   * email is evidence of a duplicate, not proof of one, so the action refuses
+   * once, shows what it found, and accepts the same submission again with a
+   * reason attached (docs/01-data-model.md §1).
+   */
+  warnings?: Array<{ message: string; href?: string }>
 }
 
 export const IDLE: ActionState = { status: 'idle' }
@@ -23,6 +31,20 @@ export function actionError(
 
 export function actionSuccess(message: string): ActionState {
   return { status: 'success', message }
+}
+
+/**
+ * A refusal the user can overrule.
+ *
+ * Distinct from `actionError` only in carrying the evidence, but the difference
+ * matters at the call site: this is the shape a form re-submits past, and
+ * `actionError` is the shape it must not.
+ */
+export function actionWarning(
+  message: string,
+  warnings: NonNullable<ActionState['warnings']>,
+): ActionState {
+  return { status: 'error', message, warnings }
 }
 
 /**

@@ -51,6 +51,38 @@ export function ConfirmSubmitButton({
   )
 }
 
+/**
+ * The duplicate matches a save was refused over, each linking to the record it
+ * found. Shown above the override field, so the person deciding whether this
+ * really is a new company can go and look at the other one first.
+ */
+export function WarningList({ state }: { state: ActionState }) {
+  if (!state.warnings || state.warnings.length === 0) return null
+
+  return (
+    <ul className="space-y-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      {state.warnings.map((warning, index) => (
+        <li key={index}>
+          {warning.message}
+          {warning.href ? (
+            <>
+              {' '}
+              <a
+                href={warning.href}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium underline"
+              >
+                Open it
+              </a>
+            </>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /** The success/error banner for a form, rendered from its action state. */
 export function FormMessage({
   state,

@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 
 import type { AuditAction, EntityType } from '@/generated/prisma/enums'
 import { prismaBase } from '@/lib/db'
+import { currentAuditTransaction } from '@/lib/audit/context'
 
 /**
  * Record an event the ORM extension cannot see.
@@ -41,20 +42,29 @@ export async function recordAudit(entry: {
     // No request context; the entry is still worth writing without them.
   }
 
+  const row = {
+    entityType: entry.entityType,
+    entityId: entry.entityId,
+    action: entry.action,
+    fieldName: entry.fieldName ?? null,
+    oldValue: entry.oldValue ?? null,
+    newValue: entry.newValue ?? null,
+    userId: entry.userId,
+    ipAddress,
+    userAgent,
+  }
+
+  // Inside an `auditedTransaction`, join its buffer. A STAGE_CHANGE entry for a
+  // transition that then rolled back is worse than no entry at all — the row it
+  // describes still sits at the old stage.
+  const transaction = currentAuditTransaction()
+  if (transaction) {
+    transaction.rows.push(row)
+    return
+  }
+
   try {
-    await prismaBase.auditLog.create({
-      data: {
-        entityType: entry.entityType,
-        entityId: entry.entityId,
-        action: entry.action,
-        fieldName: entry.fieldName ?? null,
-        oldValue: entry.oldValue ?? null,
-        newValue: entry.newValue ?? null,
-        userId: entry.userId,
-        ipAddress,
-        userAgent,
-      },
-    })
+    await prismaBase.auditLog.create({ data: row })
   } catch (error) {
     // Same rule as the extension: never fail the operation being audited.
     console.error('[audit] failed to record explicit event', entry.action, error)
