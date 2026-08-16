@@ -4,7 +4,10 @@ import { prisma } from '@/lib/db'
 import { pageAccess } from '@/lib/authz'
 import { can } from '@/lib/authz'
 import { PERMISSIONS } from '@/lib/permissions'
-import { clientVisibilityFilter } from '@/lib/visibility'
+import {
+  clientVisibilityFilter,
+  requirementVisibilityFilter,
+} from '@/lib/visibility'
 import { currencySymbol } from '@/lib/settings'
 import { formatDate, formatMoney } from '@/lib/format'
 import { AccessDenied } from '@/components/access-denied'
@@ -19,6 +22,11 @@ import { Timeline } from '@/components/activity/timeline'
 import { DocumentTable } from '@/components/documents/document-table'
 import { UploadForm } from '@/components/documents/upload-form'
 import { LEAD_STATUS_TONES } from '@/lib/leads/display'
+import {
+  fillLabel,
+  REQUIREMENT_STATUS_LABELS,
+  REQUIREMENT_STATUS_TONES,
+} from '@/lib/staffing/display'
 import { ContactForm } from './contact-form'
 import { setContactActiveAction } from '../actions'
 
@@ -116,10 +124,30 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
   // not be distinguishable from one that does not exist.
   if (!client) notFound()
 
-  const [canEdit, canManageActivity, symbol] = await Promise.all([
+  const [canEdit, canManageActivity, symbol, requirements] = await Promise.all([
     can(viewer, PERMISSIONS.LEAD_EDIT),
     can(viewer, PERMISSIONS.ACTIVITY_MANAGE),
     currencySymbol(),
+    prisma.requirement.findMany({
+      where: {
+        clientId: client.id,
+        isDeleted: false,
+        ...(await requirementVisibilityFilter(viewer)),
+      },
+      select: {
+        id: true,
+        requirementCode: true,
+        position: true,
+        openings: true,
+        positionsFilled: true,
+        status: true,
+        targetDate: true,
+        lead: { select: { id: true, leadCode: true } },
+        currentStage: { select: { name: true } },
+        assignedTo: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
   ])
 
   return (
@@ -291,12 +319,83 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
         )}
       </Card>
 
+      {/* Staffing (docs/03 §1): the client page lists every requirement across
+          all of this account's leads, which is the view a recruiter wants and
+          the lead-by-lead tabs cannot give. Scoped separately from the client
+          itself — being able to see the account does not put every role under
+          it inside your scope — and hidden entirely when there are none, so a
+          non-staffing account does not carry an empty staffing section. */}
+      {requirements.length > 0 ? (
+        <Card
+          title="Requirements"
+          description="Every staffing role across this account's leads."
+        >
+          <Table>
+            <THead>
+              <TR>
+                <TH>Requirement</TH>
+                <TH>Lead</TH>
+                <TH>Stage</TH>
+                <TH className="text-right">Openings</TH>
+                <TH>Target</TH>
+                <TH>Owner</TH>
+                <TH>Status</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {requirements.map((requirement) => (
+                <TR key={requirement.id}>
+                  <TD>
+                    <a
+                      href={`/requirements/${requirement.id}`}
+                      className="font-medium text-slate-900 hover:underline"
+                    >
+                      {requirement.requirementCode}
+                    </a>
+                    <div className="max-w-64 truncate text-xs text-slate-500">
+                      {requirement.position}
+                    </div>
+                  </TD>
+                  <TD>
+                    <a
+                      href={`/leads/${requirement.lead.id}`}
+                      className="text-slate-700 hover:underline"
+                    >
+                      {requirement.lead.leadCode}
+                    </a>
+                  </TD>
+                  <TD className="text-slate-600">
+                    {requirement.currentStage?.name ?? '—'}
+                  </TD>
+                  <TD className="text-right tabular-nums text-slate-600">
+                    {fillLabel(requirement.openings, requirement.positionsFilled)}
+                  </TD>
+                  <TD className="text-slate-600">
+                    {formatDate(requirement.targetDate)}
+                  </TD>
+                  <TD className="text-slate-600">
+                    {requirement.assignedTo?.name ?? 'Unassigned'}
+                  </TD>
+                  <TD>
+                    <Badge tone={REQUIREMENT_STATUS_TONES[requirement.status]}>
+                      {REQUIREMENT_STATUS_LABELS[requirement.status]}
+                    </Badge>
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </Card>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card
           title="Activity"
           description="Account-level history. Activity on a specific opportunity lives on that lead."
           actions={
-            canManageActivity ? <ActivityForm clientId={client.id} /> : null
+            canManageActivity ? (
+              <ActivityForm parent={{ kind: 'client', id: client.id }} />
+            ) : null
           }
         >
           <Timeline entries={client.activities} canManage={canManageActivity} />
@@ -305,7 +404,9 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
         <Card
           title="Documents"
           actions={
-            canManageActivity ? <UploadForm clientId={client.id} /> : null
+            canManageActivity ? (
+              <UploadForm parent={{ kind: 'client', id: client.id }} />
+            ) : null
           }
         >
           <DocumentTable

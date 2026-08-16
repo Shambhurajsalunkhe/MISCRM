@@ -210,7 +210,7 @@ creator's scope on save, and the lead's Overview names the day's work it answere
 It stays optional — a lead nobody can trace back to a specific Tuesday is still a
 lead.
 
-### Phase 4 — Staffing
+### Phase 4 — Staffing — **done**
 Requirements under a lead with `REQ-001` codes and their own stage list.
 Candidate master with resume upload and skill search. Submission board per
 requirement. Interview rounds. Placements and the derived lead outcome. Staffing
@@ -218,6 +218,85 @@ metrics and report.
 
 *Ends with:* the hardest vertical is done — one client, many requirements, many
 candidates, part-won leads.
+
+Delivered: `/requirements` (+ `/new`, `/[id]` with its four tabs, `/[id]/edit`,
+`/[id]/submissions/[submissionId]`), `/candidates` (+ `/new`, `/[id]`,
+`/[id]/edit`), `/placements`, `/reports/staffing`, a Requirements tab on the
+lead, a requirements section on the client page, and requirements and candidates
+in global search.
+
+**The three levels each got the stage engine the level above already had.**
+`changeRequirementStage` and `changeSubmissionStage` are
+[`src/lib/leads/stage.ts`](../src/lib/leads/stage.ts) applied one and two levels
+down: pointer, status, history row, timeline entry and audit line in one
+transaction, because the staffing report reads the history table and not the
+pointer (decision D12). The lead engine's write half was extracted as
+`applyLeadStage` so the derived outcome below goes through the same code rather
+than a second implementation that would drift.
+
+**Six decisions taken during the build:**
+
+- **Requirement codes run on one company-wide counter.** README §14 draws them
+  as `REQ-001, REQ-002, REQ-003` under a single lead, which reads as per-lead
+  numbering — but a requirement is linked to, searched for and discussed on its
+  own, and two leads each holding a `REQ-001` is a code that identifies nothing.
+  The three-under-one-lead reading survives in the lead's Requirements tab,
+  which is where the grouping actually belongs. `NumberSequence`, waiting since
+  Phase 2, needed no change.
+- **The candidate master is the one list in the application with no data
+  scope.** Decision D9 exists so that the same person submitted to three clients
+  stays one candidate; a master where a recruiter cannot see the profile a
+  colleague sourced produces exactly the duplicate rows it was built to prevent,
+  and `Candidates Sourced` then counts one person three times. What a candidate
+  row does *not* carry is any client's information — that lives on the
+  submission, which is scoped through its requirement like everything else. The
+  candidate page's submission table is scoped accordingly and says how many rows
+  it is not showing.
+- **A requirement cannot be moved to its winning stage by hand.** Decision D8
+  makes `Placement` the revenue unit, so a requirement marked Placement with no
+  placement behind it would count in Requirements Filled while contributing
+  nothing to Won Revenue. Marking the submission Joined on the board is the only
+  route: it creates the placement, increments `positionsFilled`, moves the
+  requirement to its winning stage — `FILLED` or `PARTIALLY_FILLED` depending on
+  whether that was the last opening — and re-derives the lead. The stage
+  dropdown omits the entry and says where to go instead.
+- **`CANCELLED` is not `LOST`.** A requirement the client withdrew is not a deal
+  lost to a competitor, and folding them together would put withdrawals into the
+  lost-reason breakdown with no reason attached. So `deriveLeadStatus` treats
+  them differently, and a lead whose every requirement was cancelled stays OPEN
+  — nobody has said what happened to the account, and inventing an answer is
+  worse than leaving the question visible.
+- **Reversing a placement is refused, with the reason on screen.** A candidate
+  who withdraws after joining is a real event, but it changes booked revenue and
+  Phase 5 will have invoiced against the row. Deleting a `Placement` from a
+  stage dropdown would move a dashboard number with nothing to explain it.
+- **Stage codes appear in the staffing report and nowhere else.** A deliberate
+  exception to the rule the funnel builder follows:
+  [`02` §4.7](02-funnels-and-metrics.md) defines its metrics *by* code, so a
+  report reproducing that table has to name them. Everything reads through
+  `byCode`, which returns zero for a code an administrator removed rather than
+  throwing, so a renamed stage list degrades to a blank row instead of a broken
+  screen. The two funnels beside those numbers are assembled from master data in
+  the usual way and name nothing.
+
+**Two schema gaps closed**, both pre-existing rather than new:
+
+- **`Candidate.phoneNormalised`**, the same fix `ClientContact` got in Phase 2.
+  Duplicate detection and the candidate search normalise a typed number to
+  digits while `phone` keeps what the user typed, so the index on `phone` served
+  a lookup that could never match. Backfilled in SQL with the rule
+  `normalisePhone` applies on write.
+- **`RequirementStageHistory.changedBy` and `CandidateStageHistory.changedBy`.**
+  Both carried `changedById` from the initial schema with no relation behind it,
+  so neither history tab could name who moved a stage — the one question a
+  transition log exists to answer. `LeadStageHistory` has had the foreign key
+  since the start; the migration is an `ADD CONSTRAINT` with no backfill.
+
+`AttachmentTarget` grew the three parents its Phase 2 comment promised, and the
+activity and upload forms now take a `{ kind, id }` parent instead of a widening
+list of optional props. Requirements, candidates and submissions got timelines,
+documents and authorised downloads with no change to either server action beyond
+the parent lookup.
 
 ### Phase 5 — Product Sales, Digital Marketing & money
 Demos and quotations with line items. Contracts. Invoices, payments, the four
@@ -329,6 +408,43 @@ Phase 2 review fixed before this phase started.
   one edit.
 - **The funnel has no export.** Same answer as the lead list: Excel and PDF
   arrive with the reports in Phase 6.
-- **`/reports` lists ten reports and links one.** The nine placeholders name the
-  phase that brings them, so the index stays honest as they land — but it is a
+- ~~**`/reports` lists ten reports and links one.**~~ It links two now. Still a
   hard-coded list, and each new report has to be added to it as well as routed.
+
+### Carried into later phases from the Phase 4 build
+
+- **`subReached()` has the same shape as `reached()`, and the same caveat.** It
+  fetches distinct `(stage, submission)` pairs and counts them in memory —
+  correct, indexed on the transition date, and a read of every history row in
+  the period rather than an aggregate. Phase 6 is where all three levels get
+  converted to `GROUP BY` together, because that is when they start being
+  computed for eight verticals at once.
+- **Reversing a placement is Phase 5's to define.** The refusal above is the
+  right answer today; it stops being one once there are invoices to credit.
+  Whatever Phase 5 builds should be a reversal that writes its own record, not a
+  delete.
+- **`Requirement` has no assignment-history table**, so a handover shows in the
+  audit trail as a field change rather than in a table of its own — which is why
+  the requirement's History tab has two sections where the lead's has three. A
+  requirement changes hands far less often than a lead, and the audit row is
+  enough until somebody asks for the report.
+- **Submission stage moves land on the requirement's timeline**, because
+  `Activity` has no submission column. That is the right place to read them, but
+  it means a busy requirement's timeline mixes per-candidate moves with
+  account-level notes and there is no filter to pull them apart.
+- **Neither new list paginates**, matching `/leads` and `/clients`: 100
+  requirements, 100 candidates, and a footer that says so. Same answer as
+  before — revisit alongside Q5 before Phase 6.
+- **The candidate skill search is a `contains` scan on a free-text column.**
+  Multiple terms are ANDed, which is what the field's placeholder promises, but
+  each is an unindexed substring match. A trigram index or a proper skills table
+  is the real answer, and is worth building when the master is big enough for
+  the scan to be felt rather than in advance of it.
+- **The staffing report has no export**, same as the funnel. Excel and PDF
+  arrive with the reports in Phase 6.
+- **The requirement list's ageing filter asks a coarser question than the
+  detail page.** Per-stage `agingThresholdDays` is master data, so "past its own
+  threshold" is not one number the list can filter on in SQL; the filter offers
+  "not moved in 14 days" instead, and the requirement header shows the real
+  per-stage threshold. Worth unifying with the Pipeline Aging report in Phase 6,
+  which faces the same problem one level up.

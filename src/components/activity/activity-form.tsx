@@ -9,23 +9,22 @@ import {
   ACTIVITY_TYPE_LABELS,
   MANUAL_ACTIVITY_TYPES,
 } from '@/lib/activity-types'
+import {
+  ATTACHMENT_FIELD,
+  type AttachmentParent,
+} from '@/lib/attachment-kinds'
 import { IDLE } from '@/lib/form'
 import { logActivityAction } from '@/server/activities'
 
 /**
- * Log a call, email, meeting or note against a lead or a client (README §23).
+ * Log a call, email, meeting or note against a lead, client, requirement or
+ * candidate (README §23).
  *
  * Collapsed until asked for, because the timeline is read far more often than
  * it is written to, and an open six-field form above the history pushes the
  * history off the screen.
  */
-export function ActivityForm({
-  leadId,
-  clientId,
-}: {
-  leadId?: string
-  clientId?: string
-}) {
+export function ActivityForm({ parent }: { parent: AttachmentParent }) {
   const [state, formAction] = useActionState(logActivityAction, IDLE)
   const [open, setOpen] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
@@ -56,8 +55,11 @@ export function ActivityForm({
       action={formAction}
       className="space-y-3 rounded-md border border-slate-200 bg-slate-50/60 p-3"
     >
-      {leadId ? <input type="hidden" name="leadId" value={leadId} /> : null}
-      {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
+      <input
+        type="hidden"
+        name={ATTACHMENT_FIELD[parent.kind]}
+        value={parent.id}
+      />
 
       <FormMessage state={state} />
 
@@ -118,7 +120,7 @@ export function ActivityForm({
           label="Follow up on"
           htmlFor="activity-followup"
           hint={
-            leadId
+            parent.kind === 'lead'
               ? 'Also sets the lead’s next follow-up date, unless one sooner is already set.'
               : undefined
           }

@@ -8,11 +8,15 @@ export const metadata = { title: 'Reports · Sales CRM' }
 /**
  * The reports index (docs/03 §1).
  *
- * Eleven reports are specified and one is built. The rest are listed as coming
+ * Eleven reports are specified and two are built. The rest are listed as coming
  * rather than hidden, because the sidebar has linked here since Phase 0 and an
  * index that silently showed a single card would read as "this is all there
  * is". Each arrives with the phase that has the data behind it — there is no
  * honest Revenue report before Phase 5 creates an invoice.
+ *
+ * A hard-coded list, and each new report has to be added here as well as
+ * routed. Worth revisiting if the count grows past this; at eleven, a registry
+ * would be more machinery than the problem deserves.
  */
 const REPORTS: Array<{
   href: string | null
@@ -28,7 +32,7 @@ const REPORTS: Array<{
     phase: 'Phase 3',
   },
   {
-    href: null,
+    href: '/reports/staffing',
     title: 'Staffing',
     description:
       'Requirements, openings, profiles shared, interviews, selections and placements.',

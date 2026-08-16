@@ -46,6 +46,11 @@ export const NAVIGATION: NavSection[] = [
         href: '/candidates',
         permission: PERMISSIONS.STAFFING_CANDIDATE_MANAGE,
       },
+      {
+        label: 'Placements',
+        href: '/placements',
+        permission: PERMISSIONS.STAFFING_REQUIREMENT_MANAGE,
+      },
     ],
   },
   {

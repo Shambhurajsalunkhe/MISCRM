@@ -49,6 +49,115 @@ function statusFor(stage: { isWon: boolean; isLost: boolean }): LeadStatus {
 }
 
 /**
+ * The five writes, without the validation.
+ *
+ * Split out in Phase 4 so a staffing lead's *derived* outcome (decision D8) can
+ * move its stage through exactly this code rather than a second implementation
+ * that would drift. The validation above it — reason on a backward move, a lost
+ * reason on a loss — belongs to a person typing a change, and none of it
+ * applies when the move is a consequence of a requirement being filled.
+ *
+ * Callers are responsible for having checked that `toStage` belongs to the
+ * lead's vertical.
+ */
+export async function applyLeadStage(
+  tx: TransactionClient,
+  input: {
+    lead: {
+      id: string
+      leadCode: string
+      currentStageId: string | null
+      stageChangedAt: Date
+    }
+    fromStage: { id: string; name: string; commonStage: CommonStage } | null
+    toStage: {
+      id: string
+      name: string
+      commonStage: CommonStage
+      isWon: boolean
+      isLost: boolean
+    }
+    actorId: string
+    note: string | null
+    lostReasonId?: string | null
+    lostNotes?: string | null
+    dealValue?: number | null
+    at?: Date
+  },
+): Promise<LeadStatus> {
+  const { lead, fromStage, toStage } = input
+  const now = input.at ?? new Date()
+  const status = statusFor(toStage)
+
+  await tx.lead.update({
+    where: { id: lead.id },
+    data: {
+      currentStageId: toStage.id,
+      commonStage: toStage.commonStage,
+      status,
+      stageChangedAt: now,
+      // Closing stamps the date; reopening clears it, so "closed in August"
+      // never counts a lead that went back into the pipeline in September.
+      closedAt: status === 'OPEN' ? null : now,
+      // Lost detail belongs to the outcome, so it is cleared when the lead
+      // stops being lost rather than lingering on a reopened deal.
+      lostReasonId: toStage.isLost ? (input.lostReasonId ?? null) : null,
+      lostNotes: toStage.isLost ? (input.lostNotes ?? null) : null,
+      ...(input.dealValue !== undefined && input.dealValue !== null
+        ? { dealValue: input.dealValue }
+        : {}),
+    },
+  })
+
+  await tx.leadStageHistory.create({
+    data: {
+      leadId: lead.id,
+      fromStageId: fromStage?.id ?? null,
+      toStageId: toStage.id,
+      fromCommonStage: fromStage?.commonStage ?? null,
+      toCommonStage: toStage.commonStage,
+      changedById: input.actorId,
+      changedAt: now,
+      // Precomputed so the aging report never has to reconstruct it by
+      // walking the whole history of every lead.
+      hoursInPreviousStage: Math.max(
+        0,
+        Math.round((now.getTime() - lead.stageChangedAt.getTime()) / 3_600_000),
+      ),
+      note: input.note,
+    },
+  })
+
+  await tx.activity.create({
+    data: {
+      type: 'STAGE_CHANGE',
+      subject: fromStage
+        ? `Stage: ${fromStage.name} → ${toStage.name}`
+        : `Stage set to ${toStage.name}`,
+      notes: input.note,
+      activityDate: now,
+      userId: input.actorId,
+      leadId: lead.id,
+    },
+  })
+
+  // The ORM writer sees this as "Lead.currentStageId changed" and cannot tell
+  // it apart from an edit. `AuditAction` has names for the three events that
+  // matter to a compliance reader, so say which one this was.
+  await recordAudit({
+    entityType: 'LEAD',
+    entityId: lead.id,
+    action: status === 'WON' ? 'WON' : status === 'LOST' ? 'LOST' : 'STAGE_CHANGE',
+    fieldName: 'currentStageId',
+    oldValue: fromStage?.name ?? null,
+    newValue: toStage.name,
+    userId: input.actorId,
+  })
+
+  return status
+}
+
+/**
  * Move a lead to a stage.
  *
  * `reason` is required for a backward move and optional otherwise — open
@@ -177,74 +286,15 @@ export async function changeLeadStage(input: {
       }
     }
 
-    const now = new Date()
-    const status = statusFor(toStage)
-
-    await tx.lead.update({
-      where: { id: lead.id },
-      data: {
-        currentStageId: toStage.id,
-        commonStage: toStage.commonStage,
-        status,
-        stageChangedAt: now,
-        // Closing stamps the date; reopening clears it, so "closed in August"
-        // never counts a lead that went back into the pipeline in September.
-        closedAt: status === 'OPEN' ? null : now,
-        // Lost detail belongs to the outcome, so it is cleared when the lead
-        // stops being lost rather than lingering on a reopened deal.
-        lostReasonId: toStage.isLost ? input.lostReasonId : null,
-        lostNotes: toStage.isLost ? (input.lostNotes ?? null) : null,
-        ...(input.dealValue !== undefined && input.dealValue !== null
-          ? { dealValue: input.dealValue }
-          : {}),
-      },
-    })
-
-    await tx.leadStageHistory.create({
-      data: {
-        leadId: lead.id,
-        fromStageId: fromStage?.id ?? null,
-        toStageId: toStage.id,
-        fromCommonStage: fromStage?.commonStage ?? null,
-        toCommonStage: toStage.commonStage,
-        changedById: input.actorId,
-        changedAt: now,
-        // Precomputed so the aging report never has to reconstruct it by
-        // walking the whole history of every lead.
-        hoursInPreviousStage: Math.max(
-          0,
-          Math.round(
-            (now.getTime() - lead.stageChangedAt.getTime()) / 3_600_000,
-          ),
-        ),
-        note: input.reason,
-      },
-    })
-
-    await tx.activity.create({
-      data: {
-        type: 'STAGE_CHANGE',
-        subject: fromStage
-          ? `Stage: ${fromStage.name} → ${toStage.name}`
-          : `Stage set to ${toStage.name}`,
-        notes: input.reason,
-        activityDate: now,
-        userId: input.actorId,
-        leadId: lead.id,
-      },
-    })
-
-    // The ORM writer sees this as "Lead.currentStageId changed" and cannot tell
-    // it apart from an edit. `AuditAction` has names for the three events that
-    // matter to a compliance reader, so say which one this was.
-    await recordAudit({
-      entityType: 'LEAD',
-      entityId: lead.id,
-      action: status === 'WON' ? 'WON' : status === 'LOST' ? 'LOST' : 'STAGE_CHANGE',
-      fieldName: 'currentStageId',
-      oldValue: fromStage?.name ?? null,
-      newValue: toStage.name,
-      userId: input.actorId,
+    await applyLeadStage(tx, {
+      lead,
+      fromStage,
+      toStage,
+      actorId: input.actorId,
+      note: input.reason,
+      lostReasonId: input.lostReasonId,
+      lostNotes: input.lostNotes,
+      dealValue: input.dealValue,
     })
 
     return {

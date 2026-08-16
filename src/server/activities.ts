@@ -9,7 +9,7 @@ import { can } from '@/lib/authz'
 import { MANUAL_ACTIVITY_TYPES } from '@/lib/activity-types'
 import { optionalDate, optionalText } from '@/lib/form-fields'
 import { PERMISSIONS } from '@/lib/permissions'
-import { resolveTarget, targetFromFormData } from '@/lib/attachments'
+import { resolveTarget, targetFromFormData, targetFromRow } from '@/lib/attachments'
 import {
   actionError,
   actionSuccess,
@@ -24,8 +24,8 @@ import {
  *
  * Shared rather than duplicated per screen because the record is shared — one
  * `Activity` table, one set of rules about who may write to it. Requirements
- * and candidates join the same two functions in Phase 4 by extending
- * `AttachmentTarget`.
+ * and candidates joined the same two functions in Phase 4 by extending
+ * `AttachmentTarget`, with no change to either action beyond the parent lookup.
  */
 
 const activitySchema = z.object({
@@ -107,16 +107,17 @@ export async function deleteActivityAction(
 
     const activity = await prisma.activity.findUnique({
       where: { id },
-      select: { userId: true, leadId: true, clientId: true },
+      select: {
+        userId: true,
+        leadId: true,
+        clientId: true,
+        requirementId: true,
+        candidateId: true,
+      },
     })
     if (!activity) return actionError('That activity no longer exists.')
 
-    const target = activity.leadId
-      ? ({ kind: 'lead', id: activity.leadId } as const)
-      : activity.clientId
-        ? ({ kind: 'client', id: activity.clientId } as const)
-        : null
-
+    const target = targetFromRow(activity)
     if (!target) return actionError('That activity is attached to a record you cannot see.')
 
     const resolved = await resolveTarget(actor, target)

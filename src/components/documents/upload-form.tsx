@@ -5,25 +5,31 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, Input, Select } from '@/components/ui/field'
 import { FormMessage, SubmitButton } from '@/components/ui/form'
+import {
+  ATTACHMENT_FIELD,
+  type AttachmentParent,
+} from '@/lib/attachment-kinds'
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from '@/lib/document-types'
 import { IDLE } from '@/lib/form'
 import { uploadDocumentAction } from '@/server/documents'
 
 /**
- * Attach a typed document to a lead or a client (README §36).
+ * Attach a typed document to a lead, client, requirement, candidate or
+ * submission (README §36).
  *
  * The `<form>` posts a real `File` through the server action; `formData` in the
  * action receives it directly, so there is no separate upload endpoint and no
  * window in which bytes exist without a row to point at them.
  */
 export function UploadForm({
-  leadId,
-  clientId,
+  parent,
   defaultDocType,
+  label,
 }: {
-  leadId?: string
-  clientId?: string
+  parent: AttachmentParent
   defaultDocType?: string
+  /** Overrides the button text — "Upload resume" on a candidate profile. */
+  label?: string
 }) {
   const [state, formAction] = useActionState(uploadDocumentAction, IDLE)
   const [open, setOpen] = useState(false)
@@ -42,7 +48,7 @@ export function UploadForm({
   if (!open) {
     return (
       <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
-        Upload document
+        {label ?? 'Upload document'}
       </Button>
     )
   }
@@ -53,8 +59,11 @@ export function UploadForm({
       action={formAction}
       className="space-y-3 rounded-md border border-slate-200 bg-slate-50/60 p-3"
     >
-      {leadId ? <input type="hidden" name="leadId" value={leadId} /> : null}
-      {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
+      <input
+        type="hidden"
+        name={ATTACHMENT_FIELD[parent.kind]}
+        value={parent.id}
+      />
 
       <FormMessage state={state} />
 

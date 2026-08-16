@@ -46,7 +46,7 @@ export type DuplicateWarning = {
  * the keeping of it belongs next to the code that finds the duplicates.
  */
 export async function recordDuplicateOverride(input: {
-  entityType: 'CLIENT' | 'CONTACT'
+  entityType: 'CLIENT' | 'CONTACT' | 'CANDIDATE'
   entityId: string
   reason: string
   warnings: DuplicateWarning[]
@@ -224,6 +224,64 @@ export async function findClientDuplicates(input: {
       excludeClientId: input.excludeClientId,
     })),
   )
+
+  return warnings
+}
+
+/**
+ * Signs that this person is already in the candidate master.
+ *
+ * Warnings only — there is no `dedupeKey` equivalent for a candidate, and there
+ * should not be. Two people genuinely do share a name, and a hard constraint
+ * would make the second one unrecordable; the cost of a duplicate candidate is
+ * a Candidates Sourced figure that counts one person twice, which is worth a
+ * sentence on screen rather than a refused save. Decision D9's reuse depends on
+ * the recruiter *seeing* the existing profile, which is what this produces.
+ *
+ * Honours the same two /admin/settings switches as the contact check: they say
+ * "warn on a matching email" and "warn on a matching phone number" without
+ * naming which table, and having candidates ignore them would make the settings
+ * screen's own description untrue.
+ */
+export async function findCandidateDuplicates(input: {
+  email?: string | null
+  phone?: string | null
+  excludeCandidateId?: string | null
+}): Promise<DuplicateWarning[]> {
+  const warnings: DuplicateWarning[] = []
+  const notSelf = input.excludeCandidateId
+    ? { id: { not: input.excludeCandidateId } }
+    : {}
+
+  const email = input.email?.trim().toLowerCase()
+  if (email && (await booleanSetting('dedupe.warn_on_contact_email', true))) {
+    const match = await prisma.candidate.findFirst({
+      where: { ...notSelf, isDeleted: false, email: { equals: email, mode: 'insensitive' } },
+      select: { id: true, fullName: true, candidateCode: true },
+    })
+
+    if (match) {
+      warnings.push({
+        message: `${match.fullName} (${match.candidateCode}) already uses ${email}.`,
+        href: `/candidates/${match.id}`,
+      })
+    }
+  }
+
+  const phone = normalisePhone(input.phone)
+  if (phone && (await booleanSetting('dedupe.warn_on_phone', true))) {
+    const match = await prisma.candidate.findFirst({
+      where: { ...notSelf, isDeleted: false, phoneNormalised: phone },
+      select: { id: true, fullName: true, candidateCode: true, phone: true },
+    })
+
+    if (match) {
+      warnings.push({
+        message: `${match.fullName} (${match.candidateCode}) has a matching phone number (${match.phone}).`,
+        href: `/candidates/${match.id}`,
+      })
+    }
+  }
 
   return warnings
 }

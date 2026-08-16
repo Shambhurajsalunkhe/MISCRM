@@ -1,10 +1,19 @@
 import { prisma } from '@/lib/db'
-import { pageAccess } from '@/lib/authz'
+import { can, pageAccess } from '@/lib/authz'
 import { PERMISSIONS } from '@/lib/permissions'
-import { clientVisibilityFilter, leadVisibilityFilter } from '@/lib/visibility'
+import {
+  clientVisibilityFilter,
+  leadVisibilityFilter,
+  requirementVisibilityFilter,
+} from '@/lib/visibility'
 import { normalisePhone } from '@/lib/dedupe'
 import { formatDate } from '@/lib/format'
 import { LEAD_STATUS_LABELS, LEAD_STATUS_TONES } from '@/lib/leads/display'
+import {
+  fillLabel,
+  REQUIREMENT_STATUS_LABELS,
+  REQUIREMENT_STATUS_TONES,
+} from '@/lib/staffing/display'
 import { AccessDenied } from '@/components/access-denied'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/field'
@@ -21,8 +30,9 @@ const LIMIT = 25
 /**
  * Global search (README §30).
  *
- * Covers lead code, client, contact name, email, phone, website and LinkedIn —
- * the identifiers someone actually has in front of them when a call comes in.
+ * Covers lead code, client, contact name, email, phone, website, LinkedIn and —
+ * from Phase 4 — requirements and the candidate master. Between them, the
+ * identifiers someone actually has in front of them when a call comes in.
  *
  * Every query is scoped through the same visibility helpers the lists use.
  * Search is where scope leaks are easiest to introduce and hardest to notice:
@@ -50,7 +60,17 @@ export default async function SearchPage({
   // stores. Comparing against the formatted `phone` column matched nothing.
   const phone = normalisePhone(term)
 
-  const [leads, clients, contacts] =
+  // The staffing sections are gated separately rather than riding on
+  // `lead.view`. A role someone can open and a person in the candidate master
+  // are two different capabilities in docs/03 §2, and a search result is a way
+  // into a record — so it has to answer to the same permission the screen
+  // behind it does.
+  const [canSeeStaffing, canSeeCandidates] = await Promise.all([
+    can(viewer, PERMISSIONS.STAFFING_REQUIREMENT_MANAGE),
+    can(viewer, PERMISSIONS.STAFFING_CANDIDATE_MANAGE),
+  ])
+
+  const [leads, clients, contacts, requirements, candidates] =
     term.length >= 2
       ? await Promise.all([
           prisma.lead.findMany({
@@ -138,16 +158,86 @@ export default async function SearchPage({
             orderBy: { name: 'asc' },
             take: LIMIT,
           }),
+          // Requirements, which README §30 names explicitly. Scoped through
+          // `requirementVisibilityFilter` rather than the lead filter: a role
+          // handed to another team's recruiter is theirs, and a search that
+          // matched it would confirm a named company is hiring.
+          canSeeStaffing
+            ? prisma.requirement.findMany({
+                where: {
+                  isDeleted: false,
+                  AND: [
+                    await requirementVisibilityFilter(viewer),
+                    {
+                      OR: [
+                        { requirementCode: insensitive },
+                        { position: insensitive },
+                        { skills: insensitive },
+                        { client: { companyName: insensitive } },
+                      ],
+                    },
+                  ],
+                },
+                select: {
+                  id: true,
+                  requirementCode: true,
+                  position: true,
+                  status: true,
+                  openings: true,
+                  positionsFilled: true,
+                  client: { select: { companyName: true } },
+                  currentStage: { select: { name: true } },
+                  assignedTo: { select: { name: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: LIMIT,
+              })
+            : Promise.resolve([]),
+          // Candidates carry no data scope — the master is shared by decision
+          // D9 — so the permission is the whole gate. See
+          // src/app/(app)/candidates/filters.ts.
+          canSeeCandidates
+            ? prisma.candidate.findMany({
+                where: {
+                  isDeleted: false,
+                  OR: [
+                    { fullName: insensitive },
+                    { candidateCode: insensitive },
+                    { email: insensitive },
+                    { primarySkills: insensitive },
+                    { currentEmployer: insensitive },
+                    ...(phone ? [{ phoneNormalised: phone }] : []),
+                  ],
+                },
+                select: {
+                  id: true,
+                  candidateCode: true,
+                  fullName: true,
+                  email: true,
+                  primarySkills: true,
+                  currentLocation: true,
+                  totalExperienceYears: true,
+                  isActive: true,
+                },
+                orderBy: { fullName: 'asc' },
+                take: LIMIT,
+              })
+            : Promise.resolve([]),
         ])
-      : [[], [], []]
+      : [[], [], [], [], []]
 
-  const totalHits = leads.length + clients.length + contacts.length
+  const totalHits =
+    leads.length +
+    clients.length +
+    contacts.length +
+    requirements.length +
+    candidates.length
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Search"
-        description="Lead code, company, contact name, email, phone, website or LinkedIn."
+        description="Lead code, company, contact, requirement, candidate — by name, code, email, phone, skill, website or LinkedIn."
       />
 
       <form className="flex max-w-xl gap-2" method="get">
@@ -158,7 +248,7 @@ export default async function SearchPage({
           id="q"
           name="q"
           defaultValue={term}
-          placeholder="UP-0001, Acme, jane@acme.com, +1 415…"
+          placeholder="UP-0001, REQ-0007, Acme, jane@acme.com, Kafka, +1 415…"
           autoFocus
         />
         <button
@@ -316,6 +406,116 @@ export default async function SearchPage({
                       </TD>
                       <TD className="text-slate-600">{contact.email ?? '—'}</TD>
                       <TD className="text-slate-600">{contact.phone ?? '—'}</TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </Card>
+          ) : null}
+
+          {requirements.length > 0 ? (
+            <Card
+              title={`Requirements (${requirements.length}${requirements.length === LIMIT ? '+' : ''})`}
+            >
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Requirement</TH>
+                    <TH>Client</TH>
+                    <TH>Stage</TH>
+                    <TH className="text-right">Openings</TH>
+                    <TH>Owner</TH>
+                    <TH>Status</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {requirements.map((requirement) => (
+                    <TR key={requirement.id}>
+                      <TD>
+                        <a
+                          href={`/requirements/${requirement.id}`}
+                          className="font-medium text-slate-900 hover:underline"
+                        >
+                          {requirement.requirementCode}
+                        </a>
+                        <div className="max-w-64 truncate text-xs text-slate-500">
+                          {requirement.position}
+                        </div>
+                      </TD>
+                      <TD className="text-slate-600">
+                        {requirement.client.companyName}
+                      </TD>
+                      <TD className="text-slate-600">
+                        {requirement.currentStage?.name ?? '—'}
+                      </TD>
+                      <TD className="text-right tabular-nums text-slate-600">
+                        {fillLabel(
+                          requirement.openings,
+                          requirement.positionsFilled,
+                        )}
+                      </TD>
+                      <TD className="text-slate-600">
+                        {requirement.assignedTo?.name ?? 'Unassigned'}
+                      </TD>
+                      <TD>
+                        <Badge
+                          tone={REQUIREMENT_STATUS_TONES[requirement.status]}
+                        >
+                          {REQUIREMENT_STATUS_LABELS[requirement.status]}
+                        </Badge>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </Card>
+          ) : null}
+
+          {candidates.length > 0 ? (
+            <Card
+              title={`Candidates (${candidates.length}${candidates.length === LIMIT ? '+' : ''})`}
+            >
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Candidate</TH>
+                    <TH>Skills</TH>
+                    <TH className="text-right">Experience</TH>
+                    <TH>Location</TH>
+                    <TH>Email</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {candidates.map((candidate) => (
+                    <TR key={candidate.id}>
+                      <TD>
+                        <a
+                          href={`/candidates/${candidate.id}`}
+                          className="font-medium text-slate-900 hover:underline"
+                        >
+                          {candidate.fullName}
+                        </a>
+                        {candidate.isActive ? null : (
+                          <Badge className="ml-2">Retired</Badge>
+                        )}
+                        <div className="text-xs text-slate-500">
+                          {candidate.candidateCode}
+                        </div>
+                      </TD>
+                      <TD className="max-w-64 truncate text-slate-600">
+                        {candidate.primarySkills ?? '—'}
+                      </TD>
+                      <TD className="text-right tabular-nums text-slate-600">
+                        {candidate.totalExperienceYears
+                          ? `${candidate.totalExperienceYears.toString()} yrs`
+                          : '—'}
+                      </TD>
+                      <TD className="text-slate-600">
+                        {candidate.currentLocation ?? '—'}
+                      </TD>
+                      <TD className="text-slate-600">
+                        {candidate.email ?? '—'}
+                      </TD>
                     </TR>
                   ))}
                 </TBody>

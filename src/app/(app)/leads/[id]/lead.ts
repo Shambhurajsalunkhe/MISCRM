@@ -90,7 +90,16 @@ export const loadLead = cache(async (user: CurrentUser, id: string) => {
       team: { select: { name: true } },
       createdBy: { select: { name: true } },
       _count: {
-        select: { activities: true, documents: true, stageHistory: true },
+        select: {
+          activities: true,
+          documents: true,
+          stageHistory: true,
+          // Unfiltered by visibility on purpose: this is the tab's badge, and a
+          // count that shrank because one role belongs to another recruiter
+          // would read as requirements having been deleted. The tab itself
+          // re-queries through the scope and says how many it is not showing.
+          requirements: true,
+        },
       },
     },
   })

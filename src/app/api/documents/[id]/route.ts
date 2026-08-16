@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth/session'
-import { resolveTarget } from '@/lib/attachments'
+import { resolveTarget, targetFromRow } from '@/lib/attachments'
 import { etagFor, read, safeFileName } from '@/lib/storage'
 
 /**
@@ -32,6 +32,9 @@ export async function GET(
       storageKey: true,
       leadId: true,
       clientId: true,
+      requirementId: true,
+      candidateId: true,
+      submissionId: true,
     },
   })
 
@@ -39,11 +42,7 @@ export async function GET(
   // with this id exists, which is exactly what the visibility rules withhold.
   if (!document) return new Response('Not found', { status: 404 })
 
-  const target = document.leadId
-    ? ({ kind: 'lead', id: document.leadId } as const)
-    : document.clientId
-      ? ({ kind: 'client', id: document.clientId } as const)
-      : null
+  const target = targetFromRow(document)
 
   if (!target || !(await resolveTarget(user, target))) {
     return new Response('Not found', { status: 404 })

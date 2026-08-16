@@ -192,6 +192,18 @@ export default async function LeadLayout({
       <LinkTabs
         tabs={[
           { label: 'Overview', href: base, exact: true },
+          // Staffing only (docs/03 §1). Driven by the vertical's module switch
+          // rather than a list of vertical codes, so a ninth vertical that
+          // turns requirements on gets the tab with no code change.
+          ...(lead.vertical.usesRequirements
+            ? [
+                {
+                  label: 'Requirements',
+                  href: `${base}/requirements`,
+                  count: lead._count.requirements,
+                },
+              ]
+            : []),
           {
             label: 'Timeline',
             href: `${base}/timeline`,

@@ -6,7 +6,7 @@ import { prisma } from '@/lib/db'
 import { withAudit } from '@/lib/action'
 import { can } from '@/lib/authz'
 import { PERMISSIONS } from '@/lib/permissions'
-import { resolveTarget, targetFromFormData } from '@/lib/attachments'
+import { resolveTarget, targetFromFormData, targetFromRow } from '@/lib/attachments'
 import {
   isAllowedExtension,
   isAllowedMimeType,
@@ -111,16 +111,14 @@ export async function deleteDocumentAction(
         uploadedById: true,
         leadId: true,
         clientId: true,
+        requirementId: true,
+        candidateId: true,
+        submissionId: true,
       },
     })
     if (!document) return actionError('That document no longer exists.')
 
-    const target = document.leadId
-      ? ({ kind: 'lead', id: document.leadId } as const)
-      : document.clientId
-        ? ({ kind: 'client', id: document.clientId } as const)
-        : null
-
+    const target = targetFromRow(document)
     if (!target) return actionError('That document belongs to a record you cannot see.')
 
     const resolved = await resolveTarget(actor, target)

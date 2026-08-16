@@ -40,7 +40,7 @@ export default async function LeadDocumentsPage({ params }: { params: Params }) 
       actions={
         canManage ? (
           <UploadForm
-            leadId={lead.id}
+            parent={{ kind: 'lead', id: lead.id }}
             // Staffing leads collect resumes; everyone else starts at the
             // requirement document. A default that is right most of the time
             // beats one that is right never.

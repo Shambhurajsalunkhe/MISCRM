@@ -295,6 +295,8 @@ model User {
   assignmentsFrom       LeadAssignmentHistory[] @relation("AssignmentFrom")
   assignmentsTo         LeadAssignmentHistory[] @relation("AssignmentTo")
   requirementsAssigned  Requirement[]          @relation("RequirementOwner")
+  requirementStageChanges RequirementStageHistory[] @relation("RequirementStageActor")
+  candidateStageChanges   CandidateStageHistory[]   @relation("CandidateStageActor")
   candidatesCreated     Candidate[]            @relation("CandidateCreatedBy")
   submissionsMade       CandidateSubmission[]  @relation("SubmittedBy")
   demosConducted        Demo[]                 @relation("DemoOwner")
@@ -500,6 +502,11 @@ model RequirementStageHistory {
   requirement Requirement       @relation(fields: [requirementId], references: [id], onDelete: Cascade)
   fromStage   RequirementStage? @relation("ReqStageFrom", fields: [fromStageId], references: [id])
   toStage     RequirementStage  @relation("ReqStageTo", fields: [toStageId], references: [id])
+  /// Added in Phase 4. `changedById` was already here, but with no relation the
+  /// requirement's History tab could not name who moved the stage — the one
+  /// question a transition log exists to answer. `LeadStageHistory` has had
+  /// this since the initial schema.
+  changedBy   User              @relation("RequirementStageActor", fields: [changedById], references: [id])
 
   @@index([requirementId, changedAt])
   @@index([toStageId, changedAt])
@@ -901,6 +908,12 @@ model Candidate {
   fullName            String
   email               String?
   phone               String?
+  /// Digits only, last ten kept. Added in Phase 4 for the same reason
+  /// `ClientContact.phoneNormalised` was added in Phase 2: duplicate detection
+  /// and phone search normalise their input, so comparing against the
+  /// as-typed column matches nothing. Written through
+  /// `contactPhoneFields` in src/lib/dedupe.ts.
+  phoneNormalised     String?
   currentLocation     String?
   preferredLocation   String?
   totalExperienceYears Decimal? @db.Decimal(4, 1)
@@ -928,7 +941,7 @@ model Candidate {
 
   @@index([fullName])
   @@index([email])
-  @@index([phone])
+  @@index([phoneNormalised])
 }
 
 /// The join that carries per-requirement progress (README §16).
@@ -981,6 +994,8 @@ model CandidateStageHistory {
   submission CandidateSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   fromStage  CandidateStage?     @relation("CandStageFrom", fields: [fromStageId], references: [id])
   toStage    CandidateStage      @relation("CandStageTo", fields: [toStageId], references: [id])
+  /// Added in Phase 4, for the same reason as `RequirementStageHistory.changedBy`.
+  changedBy  User                @relation("CandidateStageActor", fields: [changedById], references: [id])
 
   @@index([submissionId, changedAt])
   @@index([toStageId, changedAt])

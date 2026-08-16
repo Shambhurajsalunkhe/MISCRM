@@ -1,23 +1,49 @@
 import 'server-only'
 
 import { prisma } from '@/lib/db'
-import { clientVisibilityFilter, leadVisibilityFilter } from '@/lib/visibility'
+import { can } from '@/lib/authz'
+import { PERMISSIONS } from '@/lib/permissions'
+import {
+  clientVisibilityFilter,
+  leadVisibilityFilter,
+  requirementVisibilityFilter,
+} from '@/lib/visibility'
+import {
+  ATTACHMENT_FIELD,
+  ATTACHMENT_KINDS,
+  type AttachmentKind,
+} from '@/lib/attachment-kinds'
 import type { CurrentUser } from '@/lib/auth/session'
 
 /**
- * Activities and documents hang off whichever record they belong to — a lead
- * today, a requirement or candidate in Phase 4. Both tables carry one nullable
- * foreign key per parent (docs/01-data-model.md §4).
+ * Activities and documents hang off whichever record they belong to — a lead, a
+ * client, a requirement, a candidate, or (documents only) a submission. Both
+ * tables carry one nullable foreign key per parent
+ * (docs/01-data-model.md §4).
  *
  * Every write to either has to answer the same question first: may this user
  * touch that parent? Answering it once, here, is what stops a hand-crafted
  * request attaching a note to somebody else's lead — the parent id arrives in a
  * form field, so it is never trustworthy on its own.
+ *
+ * **Candidates are the one target with no row scope**, and that is deliberate.
+ * Decision D9 makes the candidate master shared so that one person submitted to
+ * three clients stays one candidate; a master where a recruiter cannot see the
+ * profile a colleague sourced is a master that produces the duplicate rows it
+ * exists to prevent. What a candidate row does *not* carry is any client's
+ * information — that lives on the submission, which is scoped through its
+ * requirement like everything else here.
+ *
+ * Because a candidate has no row scope, **the staffing permission is its only
+ * gate, and it is checked here** rather than left to the caller. Both callers
+ * hold `activity.manage`, which is a different capability: without this, an
+ * administrator who revoked someone's `staffing.candidate.manage` would still
+ * leave them able to attach files to any candidate and — through
+ * `/api/documents/[id]`, which resolves the same targets — download every
+ * resume in the master.
  */
 
-export type AttachmentTarget =
-  | { kind: 'lead'; id: string }
-  | { kind: 'client'; id: string }
+export type AttachmentTarget = { kind: AttachmentKind; id: string }
 
 export type ResolvedTarget = {
   target: AttachmentTarget
@@ -26,7 +52,12 @@ export type ResolvedTarget = {
   /** Where the change shows up, for `revalidatePath`. */
   path: string
   /** The `where` fragment identifying this parent on Activity and Document. */
-  link: { leadId: string } | { clientId: string }
+  link:
+    | { leadId: string }
+    | { clientId: string }
+    | { requirementId: string }
+    | { candidateId: string }
+    | { submissionId: string }
 }
 
 /**
@@ -61,36 +92,129 @@ export async function resolveTarget(
     }
   }
 
-  const client = await prisma.client.findFirst({
-    where: {
-      id: target.id,
-      isDeleted: false,
-      ...(await clientVisibilityFilter(user)),
-    },
-    select: { id: true, companyName: true },
+  if (target.kind === 'client') {
+    const client = await prisma.client.findFirst({
+      where: {
+        id: target.id,
+        isDeleted: false,
+        ...(await clientVisibilityFilter(user)),
+      },
+      select: { id: true, companyName: true },
+    })
+
+    if (!client) return null
+
+    return {
+      target,
+      label: client.companyName,
+      path: `/clients/${client.id}`,
+      link: { clientId: client.id },
+    }
+  }
+
+  if (target.kind === 'requirement') {
+    if (!(await can(user, PERMISSIONS.STAFFING_REQUIREMENT_MANAGE))) return null
+
+    const requirement = await prisma.requirement.findFirst({
+      where: {
+        id: target.id,
+        isDeleted: false,
+        ...(await requirementVisibilityFilter(user)),
+      },
+      select: { id: true, requirementCode: true },
+    })
+
+    if (!requirement) return null
+
+    return {
+      target,
+      label: requirement.requirementCode,
+      path: `/requirements/${requirement.id}`,
+      link: { requirementId: requirement.id },
+    }
+  }
+
+  if (target.kind === 'submission') {
+    if (!(await can(user, PERMISSIONS.STAFFING_CANDIDATE_MANAGE))) return null
+
+    // Scoped through the requirement, not the candidate: a submission is the
+    // one staffing record that names a client's interest in a person, so it
+    // inherits the requirement's scope rather than the master's openness.
+    const submission = await prisma.candidateSubmission.findFirst({
+      where: {
+        id: target.id,
+        requirement: {
+          isDeleted: false,
+          ...(await requirementVisibilityFilter(user)),
+        },
+      },
+      select: {
+        id: true,
+        requirementId: true,
+        candidate: { select: { fullName: true } },
+        requirement: { select: { requirementCode: true } },
+      },
+    })
+
+    if (!submission) return null
+
+    return {
+      target,
+      label: `${submission.candidate.fullName} on ${submission.requirement.requirementCode}`,
+      path: `/requirements/${submission.requirementId}/submissions/${submission.id}`,
+      link: { submissionId: submission.id },
+    }
+  }
+
+  // Candidate — see the module comment. The permission is the whole gate here,
+  // because there is no row scope behind it.
+  if (!(await can(user, PERMISSIONS.STAFFING_CANDIDATE_MANAGE))) return null
+
+  const candidate = await prisma.candidate.findFirst({
+    where: { id: target.id, isDeleted: false },
+    select: { id: true, fullName: true },
   })
 
-  if (!client) return null
+  if (!candidate) return null
 
   return {
     target,
-    label: client.companyName,
-    path: `/clients/${client.id}`,
-    link: { clientId: client.id },
+    label: candidate.fullName,
+    path: `/candidates/${candidate.id}`,
+    link: { candidateId: candidate.id },
   }
 }
 
-/** Read the parent out of a form payload. Exactly one of the two is expected. */
+/** Read the parent out of a form payload. Exactly one field is expected. */
 export function targetFromFormData(formData: FormData): AttachmentTarget | null {
-  const leadId = formData.get('leadId')
-  if (typeof leadId === 'string' && leadId !== '') {
-    return { kind: 'lead', id: leadId }
+  for (const kind of ATTACHMENT_KINDS) {
+    const value = formData.get(ATTACHMENT_FIELD[kind])
+    if (typeof value === 'string' && value !== '') return { kind, id: value }
   }
 
-  const clientId = formData.get('clientId')
-  if (typeof clientId === 'string' && clientId !== '') {
-    return { kind: 'client', id: clientId }
-  }
+  return null
+}
 
+/**
+ * The parent an existing `Activity` or `Document` row hangs off.
+ *
+ * The two delete actions each read a row, work out which of its nullable
+ * parents is set, and re-resolve it. Doing that from the column names in one
+ * place is what keeps a new parent from being added to the schema and silently
+ * missed by a delete path — which would report "attached to a record you cannot
+ * see" for a record the user owns.
+ */
+export function targetFromRow(row: {
+  leadId?: string | null
+  clientId?: string | null
+  requirementId?: string | null
+  candidateId?: string | null
+  submissionId?: string | null
+}): AttachmentTarget | null {
+  if (row.leadId) return { kind: 'lead', id: row.leadId }
+  if (row.clientId) return { kind: 'client', id: row.clientId }
+  if (row.requirementId) return { kind: 'requirement', id: row.requirementId }
+  if (row.candidateId) return { kind: 'candidate', id: row.candidateId }
+  if (row.submissionId) return { kind: 'submission', id: row.submissionId }
   return null
 }

@@ -46,7 +46,9 @@ export default async function LeadTimelinePage({ params }: { params: Params }) {
     <Card
       title="Timeline"
       description="Calls, emails, meetings and notes, newest first — together with the stage and assignment changes the system records itself."
-      actions={canManage ? <ActivityForm leadId={lead.id} /> : null}
+      actions={
+        canManage ? <ActivityForm parent={{ kind: 'lead', id: lead.id }} /> : null
+      }
     >
       <Timeline entries={activities} canManage={canManage} />
     </Card>

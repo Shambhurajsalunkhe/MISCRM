@@ -91,6 +91,25 @@ export function nextClientCode(tx: TransactionClient): Promise<string> {
   return nextSequenceCode(tx, 'client', 'CL')
 }
 
+/**
+ * `REQ-0001` for a staffing requirement.
+ *
+ * One counter for the whole company rather than one per lead. README §14 draws
+ * the codes as `REQ-001, REQ-002, REQ-003` under a single lead, which reads as
+ * per-lead numbering — but a requirement is linked to, searched for and
+ * discussed on its own, and two different leads each holding a `REQ-001` is a
+ * code that stops identifying anything. The three-under-one-lead reading is
+ * preserved by the requirement list grouping under its lead, not by the number.
+ */
+export function nextRequirementCode(tx: TransactionClient): Promise<string> {
+  return nextSequenceCode(tx, 'requirement', 'REQ')
+}
+
+/** `CAND-0001`. The candidate master is company-wide (decision D9). */
+export function nextCandidateCode(tx: TransactionClient): Promise<string> {
+  return nextSequenceCode(tx, 'candidate', 'CAND')
+}
+
 // A `syncClientSequence` helper lived here to fast-forward the counter past
 // pre-existing clients. It was never called, and it read-then-wrote without a
 // transaction, so two callers could have moved the counter *backwards* and
