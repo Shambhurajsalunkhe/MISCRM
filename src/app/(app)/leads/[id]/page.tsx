@@ -4,6 +4,7 @@ import { PERMISSIONS } from '@/lib/permissions'
 import { currencySymbol } from '@/lib/settings'
 import { formatDate, formatMoney } from '@/lib/format'
 import { PRIORITY_LABELS } from '@/lib/leads/display'
+import { formatCounterDate } from '@/lib/prospecting/dates'
 import { Card } from '@/components/ui/page'
 import { ExternalLink } from '@/components/ui/external-link'
 import { RowAction } from '@/components/row-action'
@@ -101,6 +102,18 @@ export default async function LeadOverviewPage({ params }: { params: Params }) {
       <Card title="Additional information">
         <dl className="space-y-2 text-sm">
           <Fact label="Campaign">{lead.campaignName ?? '—'}</Fact>
+          <Fact label="Came from">
+            {lead.sourceActivity ? (
+              <>
+                {lead.sourceActivity.metric.label} ·{' '}
+                {formatCounterDate(lead.sourceActivity.activityDate)} ·{' '}
+                {lead.sourceActivity.count} logged by{' '}
+                {lead.sourceActivity.user.name}
+              </>
+            ) : (
+              '—'
+            )}
+          </Fact>
           <Fact label="Reference">
             <ExternalLink href={lead.referenceUrl} />
           </Fact>

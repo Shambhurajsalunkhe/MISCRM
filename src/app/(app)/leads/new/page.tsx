@@ -4,6 +4,7 @@ import { PERMISSIONS } from '@/lib/permissions'
 import { ROLE_SHORT_LABELS } from '@/lib/roles'
 import { clientVisibilityFilter } from '@/lib/visibility'
 import { leadFormLayout } from '@/lib/leads/vertical-form'
+import { recentCounterBatches } from '@/lib/prospecting/source-link'
 import { AccessDenied } from '@/components/access-denied'
 import { EmptyState, PageHeader } from '@/components/ui/page'
 import { LeadForm, type LeadFormClient } from './lead-form'
@@ -65,7 +66,7 @@ export default async function NewLeadPage({
   const vertical =
     verticals.find((row) => row.id === verticalParam) ?? verticals[0]
 
-  const [sources, services, products, countries, users, clients] =
+  const [sources, services, products, countries, users, sourceActivities, clients] =
     await Promise.all([
       // Sources are either global or scoped to one vertical, and the picker
       // must offer both — a global "Referral" applies everywhere.
@@ -97,6 +98,9 @@ export default async function NewLeadPage({
         select: { id: true, name: true, role: true },
         orderBy: { name: 'asc' },
       }),
+      // Empty for Product Sales and Other Sources, which count nothing above
+      // the line — the picker then simply does not render.
+      recentCounterBatches(viewer, vertical.id),
       prisma.client.findMany({
         where: {
           isDeleted: false,
@@ -191,6 +195,7 @@ export default async function NewLeadPage({
           })),
           clients: clientOptions,
           clientsTruncated: truncated,
+          sourceActivities,
         }}
       />
     </div>

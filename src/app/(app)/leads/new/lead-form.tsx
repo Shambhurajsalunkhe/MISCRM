@@ -46,6 +46,8 @@ export type LeadFormOptions = {
   clients: LeadFormClient[]
   /** True when the client list was capped — see the hint under the picker. */
   clientsTruncated: boolean
+  /** Recent counter batches for this vertical. Empty where none are counted. */
+  sourceActivities: Array<{ id: string; label: string }>
 }
 
 /**
@@ -455,6 +457,25 @@ export function LeadForm({
               error={errors.referenceUrl}
             >
               <Input id="referenceUrl" name="referenceUrl" />
+            </Field>
+          ) : null}
+
+          {options.sourceActivities.length > 0 ? (
+            <Field
+              label="Came from"
+              htmlFor="sourceActivityId"
+              hint="The day's outreach this response answered. Optional — it is what makes the pitch-to-response rate auditable rather than only statistical."
+              error={errors.sourceActivityId}
+              className="sm:col-span-2"
+            >
+              <Select id="sourceActivityId" name="sourceActivityId" defaultValue="">
+                <option value="">Not linked</option>
+                {options.sourceActivities.map((activity) => (
+                  <option key={activity.id} value={activity.id}>
+                    {activity.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
           ) : null}
 

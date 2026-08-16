@@ -70,6 +70,18 @@ export const loadLead = cache(async (user: CurrentUser, id: string) => {
         select: { id: true, name: true, sortOrder: true, isWon: true, isLost: true },
       },
       source: { select: { name: true } },
+      // The counter batch this lead answered (decision D1). Shown on Overview
+      // so the pitch-to-response rate can be checked against a specific day's
+      // work rather than only in aggregate.
+      sourceActivity: {
+        select: {
+          id: true,
+          activityDate: true,
+          count: true,
+          metric: { select: { label: true } },
+          user: { select: { name: true } },
+        },
+      },
       service: { select: { name: true } },
       product: { select: { name: true } },
       lostReason: { select: { name: true } },

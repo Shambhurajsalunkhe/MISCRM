@@ -145,12 +145,70 @@ inside `auditedTransaction`. Neither is on a data path and both are guards
 rather than corruption risks, so they are listed here rather than done in this
 phase.
 
-### Phase 3 — Prospecting counters & the outbound verticals
+### Phase 3 — Prospecting counters & the outbound verticals — **done**
 Daily counter entry and the weekly grid. Counter summary screen. Vertical funnel
 views for Upwork, LinkedIn, Email, Cold Calling and Other Sources, with the
 bridge conversion %.
 
 *Ends with:* five of the eight verticals are fully live.
+
+Delivered: `/prospecting` (the weekly grid), `/prospecting/summary`,
+`/reports/funnel`, and a `/reports` index so the sidebar link that has pointed
+there since Phase 0 resolves. The funnel is built for *every* vertical, not the
+five named above — it reads each one's own metrics and stages, so Staffing and
+Digital Marketing already have theirs, and Product Sales and Other Sources draw
+correctly with the above-the-line half empty.
+
+**Q1 was answered by accepting the table in [`02` §2](02-funnels-and-metrics.md),
+which the seed already encodes.** Nothing in this phase hard-codes it: the
+cut-off is the `VerticalMetric.isLeadTrigger` flag, editable in Master Data, and
+the bridge % divides by whichever metric carries it. Changing where the line
+falls for a vertical is now a checkbox rather than a deployment — which is the
+right place for a question the plan flagged as most likely to need revisiting.
+
+**Four decisions taken during the build:**
+
+- **One counter row per person, per metric, per day**, enforced by a unique
+  index. It is what makes the weekly grid an upsert: re-submitting a week
+  corrects Tuesday rather than adding a second Tuesday, and a double-clicked
+  Save cannot invent forty pitches. A cleared or zeroed cell deletes its row —
+  "no pitches on Wednesday" and "nobody has said what happened on Wednesday" sum
+  to the same thing in every query here, and keeping the row would only lengthen
+  the audit trail. The cost is that the itemised use of `referenceUrl` the schema
+  comment imagines — one row per individual pitch — no longer fits; it would need
+  the index narrowed to a partial one. Nothing needs it yet.
+- **Counter dates are UTC, lead dates are local.** `activityDate` is a
+  `@db.Date`: a calendar day with no zone. Built from local midnight it lands on
+  the previous day everywhere east of UTC, so
+  [`src/lib/prospecting/dates.ts`](../src/lib/prospecting/dates.ts) works in UTC
+  throughout. `Lead.createdAt` is a real instant and stays local, because
+  "created on the 16th" means the 16th where the user is. Every query that spans
+  both — and the bridge % is exactly that query — expresses the same range twice.
+  The rule is written at the top of that module; it is the kind of thing that is
+  invisible from IST and wrong in New York.
+- **The funnel is assembled from master data, never from a list of verticals.**
+  `buildFunnel` walks the vertical's own metrics and stages and reads each
+  conversion as "this step ÷ the step above", which reproduces every table in
+  [`02` §4](02-funnels-and-metrics.md) without naming any of them. A renamed
+  stage renames itself here; a ninth vertical gets a funnel with no code change.
+  The losing stage is deliberately outside the chain — a lead does not pass
+  *through* Lost on the way to Won, and including it would make the
+  Negotiation → Won conversion divide by the wrong number. It is reported beside
+  the funnel instead.
+- **Logging on someone else's behalf reuses the D7 data scope**, not a new
+  permission. The matrix has one prospecting row, held by everyone, and says
+  nothing about whose counters you may enter — so a BDE gets themselves, a
+  BDM/Manager their reporting sub-tree, and Sales Head/Admin anyone. A manager
+  catching up a week for someone who was travelling is normal; a BDE editing a
+  colleague's pitch count is not, and BDE Performance (README §27) is read off
+  precisely these numbers.
+
+**`Lead.sourceActivityId` is now wired**, which is what decision D1 means by the
+bridge being *auditable rather than purely statistical*. The lead form offers the
+recent counter batches for its vertical, the choice is re-validated against the
+creator's scope on save, and the lead's Overview names the day's work it answered.
+It stays optional — a lead nobody can trace back to a specific Tuesday is still a
+lead.
 
 ### Phase 4 — Staffing
 Requirements under a lead with `REQ-001` codes and their own stage list.
@@ -213,7 +271,7 @@ Still worth revisiting before the phase that depends on it:
 
 | Re-check before | Question |
 |---|---|
-| Phase 3 | **Q1** — the counter-vs-lead cut-off per vertical ([`02` §2](02-funnels-and-metrics.md)). Decides what counts as a lead at all, and so every conversion % on the dashboard |
+| ~~Phase 3~~ — **settled** | ~~**Q1** — the counter-vs-lead cut-off per vertical~~. Built as tabled, and now a per-metric checkbox in Master Data rather than a code decision — see Phase 3 above |
 | Phase 5 | **Q11** — collected/pending revenue for the four non-invoicing verticals ([`02` §5](02-funnels-and-metrics.md)) |
 | Phase 6 | Q5 — user and lead volumes, which decides live queries vs pre-aggregation |
 | Phase 7 | Q4 — real integrations, or manual + CSV only? |
@@ -227,7 +285,10 @@ change stage and mark a deal Won. Both are now single toggles in
 `/admin/permissions`, so this is a decision you can make and reverse yourself
 without a deployment.
 
-### Carried into Phase 3 from the Phase 2 build
+### Still open from the Phase 2 build
+
+Everything here survived Phase 3 untouched except the phone scan, which the
+Phase 2 review fixed before this phase started.
 
 - **Neither list paginates.** `/leads` and `/clients` each show the first 100
   rows and say so in the footer; the filters are how a list is narrowed. That
@@ -238,9 +299,8 @@ without a deployment.
   client page's own "New lead" button, and the form says so. A typeahead is the
   real answer, and is worth building once there is a second screen that needs
   one.
-- **The phone-match duplicate warning is a suffix `contains` scan.** Correct,
-  and unindexable as written. It only runs on create, so it is cheap now; if
-  contacts reach six figures it wants a stored normalised column.
+- ~~**The phone-match duplicate warning is a suffix `contains` scan.**~~ Closed:
+  `ClientContact.phoneNormalised` is a stored, indexed column now.
 - **Exports are CSV.** README §29 asks for Excel and PDF as well; those arrive
   with the reports in Phase 6, where there is enough formatting to justify
   ExcelJS and React PDF.
@@ -250,3 +310,25 @@ without a deployment.
   `admin/master/stages/actions.ts`. They were blocked on interactive
   transactions, which Phase 2 built — each is now a matter of moving the body
   into `auditedTransaction`.
+
+### Carried into Phase 4 from the Phase 3 build
+
+- **`reached()` fetches distinct `(stage, lead)` pairs and counts them in
+  memory.** Correct, and indexed on the transition date, but it is a read of
+  every history row in the period rather than an aggregate. Fine at the volumes
+  Q5 assumes and the obvious thing to convert to a `GROUP BY` when the dashboard
+  reuses this query shape in Phase 6 — which is also when the funnel numbers
+  start being computed for eight verticals at once instead of one.
+- **Leads are bucketed by day in JavaScript** on the counter summary, for the
+  reason in the code comment: the day a timestamp belongs to is the day where
+  the reader is, which Postgres cannot know without being told the zone. If it
+  ever needs to be SQL, the zone has to become an explicit input rather than an
+  assumption.
+- **Weeks start on Monday, with no setting behind it.** `startOfWeek` is the one
+  function that knows; a team that wants Sunday-first needs a setting and that
+  one edit.
+- **The funnel has no export.** Same answer as the lead list: Excel and PDF
+  arrive with the reports in Phase 6.
+- **`/reports` lists ten reports and links one.** The nine placeholders name the
+  phase that brings them, so the index stays honest as they land — but it is a
+  hard-coded list, and each new report has to be added to it as well as routed.

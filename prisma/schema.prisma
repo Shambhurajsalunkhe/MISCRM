@@ -821,6 +821,12 @@ model ProspectingActivity {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// One row per person, per metric, per day. This is what makes the weekly
+  /// grid an upsert rather than an append: re-submitting a week corrects the
+  /// numbers instead of doubling them, and a double-clicked Save cannot invent
+  /// 80 pitches out of 40. Every counter query is a SUM anyway, so nothing
+  /// downstream depends on the row *count* — only on the constraint holding.
+  @@unique([userId, verticalId, metricId, activityDate])
   @@index([verticalId, activityDate])
   @@index([userId, activityDate])
   @@index([metricId, activityDate])

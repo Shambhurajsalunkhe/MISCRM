@@ -19,6 +19,7 @@ import { assignLead, recordAssignment } from '@/lib/leads/assignment'
 import { changeLeadStage } from '@/lib/leads/stage'
 import { setInitialStage } from '@/lib/leads/stage'
 import { PERMISSIONS } from '@/lib/permissions'
+import { isValidSourceActivity } from '@/lib/prospecting/source-link'
 import { clientVisibilityFilter, leadVisibilityFilter } from '@/lib/visibility'
 import {
   optionalDate,
@@ -62,6 +63,8 @@ const leadSchema = z.object({
   nextFollowUpAt: optionalDate,
   generatedById: optionalId,
   assignedToId: optionalId,
+  /** The counter batch this lead answered — set on create only (decision D1). */
+  sourceActivityId: optionalId,
 })
 
 /** Creating a lead against a company that is not on file yet. */
@@ -274,6 +277,16 @@ export async function createLeadAction(
       })
     }
 
+    // Which day's outreach produced this. Re-checked here rather than trusted
+    // from the form — see `isValidSourceActivity`. An id that no longer stands
+    // up is dropped rather than refused: the link is a nicety, and losing the
+    // lead over it would be the wrong trade.
+    const sourceActivityId =
+      data.sourceActivityId &&
+      (await isValidSourceActivity(actor, data.sourceActivityId, vertical.id))
+        ? data.sourceActivityId
+        : null
+
     const now = new Date()
 
     const lead = await auditedTransaction(async (tx) => {
@@ -294,6 +307,7 @@ export async function createLeadAction(
           additionalNotes: data.additionalNotes,
           campaignName: data.campaignName,
           referenceUrl: data.referenceUrl,
+          sourceActivityId,
           expectedCloseDate: data.expectedCloseDate,
           nextFollowUpAt: data.nextFollowUpAt,
           generatedById: generatedBy.id,
@@ -366,8 +380,17 @@ export async function updateLeadAction(
     // the lead exposes. Changing it after a stage history exists would leave
     // history pointing at stages the lead's new vertical does not contain, so
     // it is fixed at creation and omitted from this schema.
+    //
+    // `sourceActivityId` is omitted for a different reason: the edit form does
+    // not render it, so it would parse as null and quietly unlink every lead
+    // from the counter batch it came from on the next unrelated save.
     const parsed = leadSchema
-      .omit({ verticalId: true, generatedById: true, assignedToId: true })
+      .omit({
+        verticalId: true,
+        generatedById: true,
+        assignedToId: true,
+        sourceActivityId: true,
+      })
       .safeParse(formValues(formData))
     if (!parsed.success) return fromZodError(parsed.error)
 
