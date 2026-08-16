@@ -117,6 +117,24 @@ export function normalisePhone(phone: string | null | undefined): string | null 
   return digits.length >= 7 ? digits.slice(-10) : null
 }
 
+/**
+ * The two columns a contact's phone number occupies, from one input.
+ *
+ * `phone` keeps what the user typed, because that is what they want to read
+ * back. `phoneNormalised` carries the comparison form. Every write path builds
+ * both through this, so the two cannot drift — a row saved with a stale
+ * `phoneNormalised` is a row the duplicate check silently stops seeing.
+ *
+ * The backfill in the `contact_phone_normalised` migration applies the same
+ * rule in SQL; if this function changes, that rule has to be re-applied.
+ */
+export function contactPhoneFields(phone: string | null): {
+  phone: string | null
+  phoneNormalised: string | null
+} {
+  return { phone, phoneNormalised: normalisePhone(phone) }
+}
+
 /** Compare hostnames, ignoring scheme, `www.` and trailing slashes. */
 export function normaliseUrl(url: string | null | undefined): string | null {
   if (!url) return null
@@ -251,15 +269,15 @@ export async function findContactDuplicates(input: {
 
   const phone = normalisePhone(input.phone)
   if (phone && (await booleanSetting('dedupe.warn_on_phone', true))) {
-    // The stored value keeps its formatting, so match on the digit tail rather
-    // than on equality. `contains` over a short suffix is a sequential scan on
-    // a large table — acceptable at the assumed volumes (open question Q5), and
-    // the place to revisit if contacts run into the hundreds of thousands.
+    // Equality against the normalised column, which is indexed. This used to
+    // be `phone: { contains: phone }` against the *formatted* column — digits
+    // on one side, `+1 (415) 555-0134` on the other, so it matched nothing and
+    // the warning never fired for any number anyone had punctuated.
     const match = await prisma.clientContact.findFirst({
       where: {
         ...notSelf,
         ...notSameClient,
-        phone: { contains: phone },
+        phoneNormalised: phone,
         client: { isDeleted: false },
       },
       select: { id: true, name: true, phone: true, client: { select: { id: true, companyName: true } } },

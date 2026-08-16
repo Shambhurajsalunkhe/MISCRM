@@ -621,6 +621,15 @@ model ClientContact {
   designation    String?
   email          String?
   phone          String?
+  /// Last 10 digits of `phone`, maintained by the application on every write.
+  ///
+  /// Duplicate detection and phone search compare digits, but `phone` holds
+  /// whatever the user typed — `+1 (415) 555-0134` and `415-555-0134` are the
+  /// same number written two ways. Matching against the formatted column found
+  /// nothing at all, so both features were silently dead. Storing the
+  /// comparison form alongside the display form makes the match an indexed
+  /// equality test rather than an unindexable scan.
+  phoneNormalised String?
   linkedInProfile String?
   isPrimary      Boolean @default(false)
   isActive       Boolean @default(true)
@@ -633,7 +642,7 @@ model ClientContact {
 
   @@index([clientId])
   @@index([email])
-  @@index([phone])
+  @@index([phoneNormalised])
 }
 
 // =============================================================================

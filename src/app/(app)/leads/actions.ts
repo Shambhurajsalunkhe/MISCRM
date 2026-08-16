@@ -10,6 +10,7 @@ import { can } from '@/lib/authz'
 import { nextClientCode, nextLeadCode } from '@/lib/codes'
 import {
   buildDedupeKey,
+  contactPhoneFields,
   emailDomain,
   findClientDuplicates,
   recordDuplicateOverride,
@@ -176,7 +177,7 @@ async function resolveClient(
               clientId: client.id,
               name: data.contactName,
               email: data.contactEmail,
-              phone: data.contactPhone,
+              ...contactPhoneFields(data.contactPhone),
               isPrimary: true,
             },
             select: { id: true },

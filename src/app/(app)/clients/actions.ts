@@ -13,6 +13,7 @@ import {
   emailDomain,
   findClientDuplicates,
   findContactDuplicates,
+  contactPhoneFields,
   normaliseUrl,
   recordDuplicateOverride,
 } from '@/lib/dedupe'
@@ -188,7 +189,7 @@ export async function createClientAction(
               name: contactName,
               designation: contactDesignation,
               email: contactEmail,
-              phone: contactPhone,
+              ...contactPhoneFields(contactPhone),
               linkedInProfile: contactLinkedIn,
               isPrimary: true,
             },
@@ -343,11 +344,17 @@ export async function saveContactAction(
         })
       }
 
+      // `contactPhoneFields` writes both the display and comparison forms of
+      // the number together, so the duplicate check can never be looking at a
+      // stale normalisation of a number that has since been edited.
+      const phoneFields = contactPhoneFields(data.phone)
+
       if (id) {
         await tx.clientContact.update({
           where: { id },
           data: {
             ...data,
+            ...phoneFields,
             isPrimary,
             isActive: checkboxValue(formData, 'isActive'),
           },
@@ -357,7 +364,7 @@ export async function saveContactAction(
       }
 
       const created = await tx.clientContact.create({
-        data: { ...data, clientId, isPrimary },
+        data: { ...data, ...phoneFields, clientId, isPrimary },
         select: { id: true },
       })
 

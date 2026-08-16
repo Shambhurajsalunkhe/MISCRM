@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { pageAccess } from '@/lib/authz'
 import { PERMISSIONS } from '@/lib/permissions'
 import { clientVisibilityFilter, leadVisibilityFilter } from '@/lib/visibility'
+import { normalisePhone } from '@/lib/dedupe'
 import { formatDate } from '@/lib/format'
 import { LEAD_STATUS_LABELS, LEAD_STATUS_TONES } from '@/lib/leads/display'
 import { AccessDenied } from '@/components/access-denied'
@@ -44,9 +45,10 @@ export default async function SearchPage({
   const tooShort = term.length > 0 && term.length < 2
 
   const insensitive = { contains: term, mode: 'insensitive' as const }
-  // Phone numbers are stored as typed, so match on digits alone: someone
-  // reading a number off a screen types it differently every time.
-  const digits = term.replace(/\D/g, '')
+  // Someone reading a number off a screen types it differently every time, so
+  // the search term is reduced to the same normalised form the contact row
+  // stores. Comparing against the formatted `phone` column matched nothing.
+  const phone = normalisePhone(term)
 
   const [leads, clients, contacts] =
     term.length >= 2
@@ -121,7 +123,7 @@ export default async function SearchPage({
                 { name: insensitive },
                 { email: insensitive },
                 { linkedInProfile: insensitive },
-                ...(digits.length >= 5 ? [{ phone: { contains: digits } }] : []),
+                ...(phone ? [{ phoneNormalised: phone }] : []),
               ],
             },
             select: {
