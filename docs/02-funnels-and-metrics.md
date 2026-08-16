@@ -337,24 +337,35 @@ row to the counts above, the same as every other vertical.
 Never add these to the lead KPIs. They answer a different question — *how much
 of the demand did we service* — in a different unit.
 
-### ⚠ One consequence of decision D6 you should be aware of
+### Q11 — settled 16 Aug 2026: invoicing is enabled for every vertical
 
-You chose invoicing for **Digital Marketing, Product Sales and Staffing only**.
-That means Upwork, LinkedIn, Email and Cold Calling deals will show **Won Revenue
-but no Collected or Pending Revenue** — there is nothing to collect against.
+The original position was invoicing for **Digital Marketing, Product Sales and
+Staffing only**, which is what the seed still encodes: `usesInvoicing` is `true`
+on `DM`, `PR` and `ST` and absent on the rest. That left **five** verticals —
+Upwork, LinkedIn, Email, Cold Calling and Other Sources — showing Won Revenue
+with no Collected or Pending Revenue behind it, so `Collected + Pending` would
+never reconcile to `Won Revenue` on the dashboard.
 
-So on the dashboard, `Collected + Pending` will not reconcile to `Won Revenue`.
+*(This section and the plan's open-questions table both said "four". Other
+Sources was overlooked because it is also the vertical with no counters above
+the line, so it tends to fall out of lists. It is five.)*
 
-Three ways to handle it, your call — **this is open question Q11**:
+The three options tabled were: caveat the KPIs; enable invoicing everywhere; or
+add a bare "Amount Received" field to won leads in the non-invoicing verticals.
 
-1. Show Collected/Pending KPIs with a "covers DM, Product Sales & Staffing" note.
-2. Enable invoicing for all verticals after all (a one-line master-data flag —
-   `SalesVertical.usesInvoicing` is already in the schema).
-3. Add a simple "Amount Received" field on won leads in the other four verticals,
-   without full invoicing.
+**Option 2 was chosen.** Upwork and LinkedIn projects do get paid in
+instalments, the `Invoice` and `Payment` tables already exist, and
+`SalesVertical.usesInvoicing` is a master-data flag rather than a code path — so
+this is a seed change and a checkbox, not a schema change. What it buys is that
+Phase 6 has no special cases: `Collected + Pending` reconciles to `Won Revenue`
+for all eight verticals, every revenue report means the same thing everywhere,
+and no screen has to carry an asterisk explaining which channels it covers.
 
-I'd suggest **option 2** — Upwork and LinkedIn projects do get paid in
-instalments, and you already have the table. But it's your process, not mine.
+**What Phase 5 has to do about it:** flip `usesInvoicing` on for the remaining
+five in the seed, and treat the flag as the only thing that decides whether a
+lead exposes invoicing — never a list of vertical codes, the same rule the lead
+form and the funnel builder already follow. An administrator turning it back off
+for one vertical is then a supported act rather than a broken report.
 
 ---
 

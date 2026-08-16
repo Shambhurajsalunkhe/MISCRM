@@ -1,3 +1,4 @@
+import { prisma } from '@/lib/db'
 import { can } from '@/lib/authz'
 import { requireUser } from '@/lib/auth/session'
 import { PERMISSIONS } from '@/lib/permissions'
@@ -19,6 +20,21 @@ import { RequirementStageControl } from './stage-control'
 import { RequirementStatusControl } from './status-control'
 
 type Params = Promise<{ id: string }>
+
+/**
+ * The code in the tab title, so a recruiter with four requirements open can
+ * tell them apart — the same thing the client and lead pages do. Deliberately
+ * not the position: two clients hiring a Senior Java Developer would give two
+ * identical tabs, and the code is the identifier people actually quote.
+ */
+export async function generateMetadata({ params }: { params: Params }) {
+  const { id } = await params
+  const requirement = await prisma.requirement.findUnique({
+    where: { id },
+    select: { requirementCode: true },
+  })
+  return { title: `${requirement?.requirementCode ?? 'Requirement'} · Sales CRM` }
+}
 
 /**
  * The requirement detail shell (docs/03-screens-and-roles.md §1).

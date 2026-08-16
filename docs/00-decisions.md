@@ -87,8 +87,13 @@ flowchart's master-data panel lists `Roles & Permissions`.
 
 You accepted the proposed default for every question below rather than
 answering them individually, so **the defaults in the right-hand column are now
-what is being built**, including Q11 (collected/pending revenue for the four
-non-invoicing verticals) in
+what is being built**.
+
+**Q11 was then answered explicitly on 16 Aug 2026, and not with its default:**
+invoicing is enabled for **every** vertical rather than for Digital Marketing,
+Product Sales and Staffing only. That makes `Collected + Pending` reconcile to
+`Won Revenue` across all eight, and removes the caveat every revenue report
+would otherwise have had to carry. See
 [`02-funnels-and-metrics.md`](02-funnels-and-metrics.md) §5.
 
 Each is still a decision rather than a fact about your business. The ones that

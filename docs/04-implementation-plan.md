@@ -351,7 +351,7 @@ Still worth revisiting before the phase that depends on it:
 | Re-check before | Question |
 |---|---|
 | ~~Phase 3~~ — **settled** | ~~**Q1** — the counter-vs-lead cut-off per vertical~~. Built as tabled, and now a per-metric checkbox in Master Data rather than a code decision — see Phase 3 above |
-| Phase 5 | **Q11** — collected/pending revenue for the four non-invoicing verticals ([`02` §5](02-funnels-and-metrics.md)) |
+| ~~Phase 5~~ — **settled** | ~~**Q11** — collected/pending revenue for the non-invoicing verticals~~. Answered 16 Aug 2026: **invoicing is enabled for every vertical**, so `Collected + Pending` reconciles to `Won Revenue` everywhere and no report carries a "covers three verticals" asterisk. It is a seed change plus a master-data flag, not a schema change — see [`02` §5](02-funnels-and-metrics.md). Note the count was five verticals, not the four this table used to say |
 | Phase 6 | Q5 — user and lead volumes, which decides live queries vs pre-aggregation |
 | Phase 7 | Q4 — real integrations, or manual + CSV only? |
 | Phase 7 | Q8 — existing data to migrate? |

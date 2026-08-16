@@ -327,33 +327,45 @@ export default async function StaffingReportPage({
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Conversion
                 label="Requirement → profile shared"
-                value={rate(activity.withProfileShared, totals.received)}
-                detail={`${number(activity.withProfileShared)} of ${number(totals.received)} requirements had at least one profile shared`}
+                numerator={activity.withProfileShared}
+                denominator={totals.received}
+                unit="requirements had at least one profile shared"
+                emptyUnit="requirements were raised"
               />
               <Conversion
                 label="Profiles shared → shortlist"
-                value={rate(shortlisted, shared)}
-                detail={`${number(shortlisted)} of ${number(shared)} submissions`}
+                numerator={shortlisted}
+                denominator={shared}
+                unit="submissions"
+                emptyUnit="profiles were shared"
               />
               <Conversion
                 label="Shortlist → interview"
-                value={rate(interviewScheduled, shortlisted)}
-                detail={`${number(interviewScheduled)} of ${number(shortlisted)} submissions`}
+                numerator={interviewScheduled}
+                denominator={shortlisted}
+                unit="submissions"
+                emptyUnit="profiles were shortlisted"
               />
               <Conversion
                 label="Interview → selection"
-                value={rate(selected, interviewCompleted)}
-                detail={`${number(selected)} of ${number(interviewCompleted)} completed interviews`}
+                numerator={selected}
+                denominator={interviewCompleted}
+                unit="completed interviews"
+                emptyUnit="interviews were completed"
               />
               <Conversion
                 label="Selection → placement"
-                value={rate(outcomes.placements, selected)}
-                detail={`${number(outcomes.placements)} of ${number(selected)} selections`}
+                numerator={outcomes.placements}
+                denominator={selected}
+                unit="selections"
+                emptyUnit="submissions reached Selected"
               />
               <Conversion
                 label="Requirement → placement"
-                value={rate(activity.withPlacement, totals.received)}
-                detail={`${number(activity.withPlacement)} of ${number(totals.received)} requirements had at least one placement`}
+                numerator={activity.withPlacement}
+                denominator={totals.received}
+                unit="requirements had at least one placement"
+                emptyUnit="requirements were raised"
               />
             </dl>
           </Card>
@@ -392,22 +404,45 @@ export default async function StaffingReportPage({
   )
 }
 
+/**
+ * One conversion, with the arithmetic behind it.
+ *
+ * The component builds its own detail line rather than being handed one,
+ * because "x of y" stops being a sentence when y is nought. A period where a
+ * candidate was placed without any submission ever passing through Selected —
+ * which is ordinary when a role is filled from a shortlist the client had
+ * already seen — read as "1 of 0 selections", a phrase that looks like a bug
+ * in the report rather than a gap in the data. When there is no base to divide
+ * by, say what is missing instead.
+ */
 function Conversion({
   label,
-  value,
-  detail,
+  numerator,
+  denominator,
+  unit,
+  emptyUnit,
 }: {
   label: string
-  value: number | null
-  detail: string
+  numerator: number
+  denominator: number
+  /** Reads as "3 of 8 <unit>". */
+  unit: string
+  /** Reads as "No <emptyUnit> in this period." */
+  emptyUnit: string
 }) {
+  const value = rate(numerator, denominator)
+
   return (
     <div className="rounded-lg border border-slate-200 p-3">
       <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className="mt-1 text-xl font-semibold tabular-nums text-slate-900">
         {formatRate(value)}
       </dd>
-      <p className="mt-0.5 text-xs text-slate-500">{detail}</p>
+      <p className="mt-0.5 text-xs text-slate-500">
+        {denominator > 0
+          ? `${number(numerator)} of ${number(denominator)} ${unit}`
+          : `No ${emptyUnit} in this period${numerator > 0 ? `, though ${number(numerator)} came through another route` : ''}.`}
+      </p>
     </div>
   )
 }
