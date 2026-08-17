@@ -16,6 +16,23 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
+  /**
+   * Shared secret for the scheduled-job endpoints (currently the overdue
+   * invoice sweep). Optional: without it the endpoint refuses external callers
+   * outright rather than running unauthenticated, and an administrator can
+   * still trigger the sweep from the invoice register.
+   */
+  // Blank is treated as absent, not as an invalid value. `.env.example` ships
+  // this key empty so it is discoverable, and its first line tells people to
+  // copy the file — without the transform, `CRON_SECRET=""` fails `.min(16)`
+  // (`.optional()` admits only `undefined`) and the whole app refuses to boot
+  // over a variable the comment above it calls optional.
+  CRON_SECRET: z
+    .string()
+    .trim()
+    .transform((value) => (value === '' ? undefined : value))
+    .pipe(z.string().min(16, 'CRON_SECRET must be at least 16 characters.').optional())
+    .optional(),
 })
 
 const parsed = envSchema.safeParse(process.env)

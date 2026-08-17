@@ -191,9 +191,14 @@ export async function interviewAndPlacementTotals(
         submission: { requirement: requirementScope(people) },
       },
     }),
+    // Reversed placements are excluded from both the count and the value. A
+    // candidate who withdrew after joining did not fill the role, and Selection
+    // → Placement % counting them would report a conversion the company never
+    // got — see src/lib/staffing/placement.ts.
     prisma.placement.aggregate({
       where: {
         joiningDate: instants(range),
+        reversedAt: null,
         requirement: requirementScope(people),
       },
       _count: { _all: true },
@@ -225,7 +230,7 @@ export async function requirementsWithActivity(
 
   const [withPlacement, withProfileShared] = await Promise.all([
     prisma.requirement.count({
-      where: { ...where, placements: { some: {} } },
+      where: { ...where, placements: { some: { reversedAt: null } } },
     }),
     profileSharedStageId
       ? prisma.requirement.count({

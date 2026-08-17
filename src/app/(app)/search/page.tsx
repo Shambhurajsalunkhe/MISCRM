@@ -3,9 +3,20 @@ import { can, pageAccess } from '@/lib/authz'
 import { PERMISSIONS } from '@/lib/permissions'
 import {
   clientVisibilityFilter,
+  leadChildVisibilityFilter,
   leadVisibilityFilter,
   requirementVisibilityFilter,
 } from '@/lib/visibility'
+import type { CurrentUser } from '@/lib/auth/session'
+import {
+  CONTRACT_STATUS_LABELS,
+  CONTRACT_STATUS_TONES,
+  INVOICE_STATUS_LABELS,
+  INVOICE_STATUS_TONES,
+  QUOTATION_STATUS_LABELS,
+  QUOTATION_STATUS_TONES,
+} from '@/lib/commercials/display'
+import { displayStatus } from '@/lib/commercials/overdue'
 import { normalisePhone } from '@/lib/dedupe'
 import { formatDate } from '@/lib/format'
 import { LEAD_STATUS_LABELS, LEAD_STATUS_TONES } from '@/lib/leads/display'
@@ -15,7 +26,7 @@ import {
   REQUIREMENT_STATUS_TONES,
 } from '@/lib/staffing/display'
 import { AccessDenied } from '@/components/access-denied'
-import { Badge } from '@/components/ui/badge'
+import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Input } from '@/components/ui/field'
 import { Card, EmptyState, PageHeader } from '@/components/ui/page'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
@@ -30,15 +41,118 @@ const LIMIT = 25
 /**
  * Global search (README §30).
  *
- * Covers lead code, client, contact name, email, phone, website, LinkedIn and —
- * from Phase 4 — requirements and the candidate master. Between them, the
- * identifiers someone actually has in front of them when a call comes in.
+ * Covers lead code, client, contact name, email, phone, website, LinkedIn,
+ * requirements, the candidate master and — from Phase 5 — quotation, contract
+ * and invoice numbers. Between them, the identifiers someone actually has in
+ * front of them when a call comes in, including the client ringing about a
+ * document number they are reading off a PDF.
  *
  * Every query is scoped through the same visibility helpers the lists use.
  * Search is where scope leaks are easiest to introduce and hardest to notice:
  * an unscoped query here would let anyone confirm a competitor's account exists
  * by typing its name, without ever opening a record.
  */
+type CommercialHit = {
+  href: string
+  number: string
+  kind: 'Quotation' | 'Contract' | 'Invoice'
+  status: string
+  tone: BadgeTone
+  companyName: string
+  leadId: string
+  leadCode: string
+}
+
+/**
+ * Quotation, contract and invoice numbers.
+ *
+ * Matched on the document number only — not on client or lead, which the
+ * sections above already cover. A search for "Acme" that returned every invoice
+ * Acme has ever had would bury the account itself under its own paperwork.
+ *
+ * Invoice status is the *derived* one, so a document that fell due overnight
+ * reads as overdue here for the same reason it does on the register (see
+ * src/lib/commercials/overdue.ts).
+ */
+async function findCommercials(
+  viewer: CurrentUser,
+  term: string,
+): Promise<CommercialHit[]> {
+  const insensitive = { contains: term, mode: 'insensitive' as const }
+  const scope = await leadChildVisibilityFilter(viewer)
+  const lead = {
+    select: {
+      id: true,
+      leadCode: true,
+      client: { select: { companyName: true } },
+    },
+  }
+
+  const [quotations, contracts, invoices] = await Promise.all([
+    prisma.quotation.findMany({
+      where: { ...scope, quoteNumber: insensitive },
+      select: { id: true, quoteNumber: true, status: true, lead },
+      take: LIMIT,
+    }),
+    prisma.contract.findMany({
+      where: { ...scope, contractNumber: insensitive },
+      select: { id: true, contractNumber: true, status: true, lead },
+      take: LIMIT,
+    }),
+    prisma.invoice.findMany({
+      where: { ...scope, invoiceNumber: insensitive },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        status: true,
+        totalAmount: true,
+        amountReceived: true,
+        dueDate: true,
+        lead,
+      },
+      take: LIMIT,
+    }),
+  ])
+
+  const now = new Date()
+
+  return [
+    ...quotations.map((row) => ({
+      href: `/quotations/${row.id}`,
+      number: row.quoteNumber,
+      kind: 'Quotation' as const,
+      status: QUOTATION_STATUS_LABELS[row.status],
+      tone: QUOTATION_STATUS_TONES[row.status],
+      companyName: row.lead.client.companyName,
+      leadId: row.lead.id,
+      leadCode: row.lead.leadCode,
+    })),
+    ...contracts.map((row) => ({
+      href: `/contracts/${row.id}`,
+      number: row.contractNumber,
+      kind: 'Contract' as const,
+      status: CONTRACT_STATUS_LABELS[row.status],
+      tone: CONTRACT_STATUS_TONES[row.status],
+      companyName: row.lead.client.companyName,
+      leadId: row.lead.id,
+      leadCode: row.lead.leadCode,
+    })),
+    ...invoices.map((row) => {
+      const shown = displayStatus(row, now)
+      return {
+        href: `/invoices/${row.id}`,
+        number: row.invoiceNumber,
+        kind: 'Invoice' as const,
+        status: INVOICE_STATUS_LABELS[shown],
+        tone: INVOICE_STATUS_TONES[shown],
+        companyName: row.lead.client.companyName,
+        leadId: row.lead.id,
+        leadCode: row.lead.leadCode,
+      }
+    }),
+  ].slice(0, LIMIT)
+}
+
 export default async function SearchPage({
   searchParams,
 }: {
@@ -65,10 +179,12 @@ export default async function SearchPage({
   // are two different capabilities in docs/03 §2, and a search result is a way
   // into a record — so it has to answer to the same permission the screen
   // behind it does.
-  const [canSeeStaffing, canSeeCandidates] = await Promise.all([
-    can(viewer, PERMISSIONS.STAFFING_REQUIREMENT_MANAGE),
-    can(viewer, PERMISSIONS.STAFFING_CANDIDATE_MANAGE),
-  ])
+  const [canSeeStaffing, canSeeCandidates, canSeeCommercials] =
+    await Promise.all([
+      can(viewer, PERMISSIONS.STAFFING_REQUIREMENT_MANAGE),
+      can(viewer, PERMISSIONS.STAFFING_CANDIDATE_MANAGE),
+      can(viewer, PERMISSIONS.COMMERCIAL_MANAGE),
+    ])
 
   const [leads, clients, contacts, requirements, candidates] =
     term.length >= 2
@@ -226,18 +342,26 @@ export default async function SearchPage({
         ])
       : [[], [], [], [], []]
 
+  // Quotation, contract and invoice numbers, in one section rather than three.
+  // Somebody typing `INV-0042` has a document in front of them and does not
+  // need to be asked which register it lives in; three near-empty cards would
+  // be the same information laid out worse.
+  const commercials =
+    canSeeCommercials && term.length >= 2 ? await findCommercials(viewer, term) : []
+
   const totalHits =
     leads.length +
     clients.length +
     contacts.length +
     requirements.length +
-    candidates.length
+    candidates.length +
+    commercials.length
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Search"
-        description="Lead code, company, contact, requirement, candidate — by name, code, email, phone, skill, website or LinkedIn."
+        description="Lead code, company, contact, requirement, candidate, quotation, contract or invoice — by name, code, email, phone, skill, website or LinkedIn."
       />
 
       <form className="flex max-w-xl gap-2" method="get">
@@ -248,7 +372,7 @@ export default async function SearchPage({
           id="q"
           name="q"
           defaultValue={term}
-          placeholder="UP-0001, REQ-0007, Acme, jane@acme.com, Kafka, +1 415…"
+          placeholder="UP-0001, REQ-0007, INV-0042, Acme, jane@acme.com, Kafka, +1 415…"
           autoFocus
         />
         <button
@@ -463,6 +587,51 @@ export default async function SearchPage({
                         >
                           {REQUIREMENT_STATUS_LABELS[requirement.status]}
                         </Badge>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </Card>
+          ) : null}
+
+          {commercials.length > 0 ? (
+            <Card
+              title={`Commercial documents (${commercials.length}${commercials.length === LIMIT ? '+' : ''})`}
+            >
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Document</TH>
+                    <TH>Kind</TH>
+                    <TH>Client</TH>
+                    <TH>Lead</TH>
+                    <TH>Status</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {commercials.map((row) => (
+                    <TR key={row.href}>
+                      <TD>
+                        <a
+                          href={row.href}
+                          className="font-medium text-slate-900 hover:underline"
+                        >
+                          {row.number}
+                        </a>
+                      </TD>
+                      <TD className="text-slate-600">{row.kind}</TD>
+                      <TD className="text-slate-600">{row.companyName}</TD>
+                      <TD>
+                        <a
+                          href={`/leads/${row.leadId}`}
+                          className="text-slate-700 hover:underline"
+                        >
+                          {row.leadCode}
+                        </a>
+                      </TD>
+                      <TD>
+                        <Badge tone={row.tone}>{row.status}</Badge>
                       </TD>
                     </TR>
                   ))}

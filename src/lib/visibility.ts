@@ -88,6 +88,32 @@ export async function clientVisibilityFilter(user: CurrentUser) {
   }
 }
 
+/**
+ * Demos, quotations, contracts and invoices, all scoped through their lead.
+ *
+ * None of the four carries an owner of its own, and none should: an invoice is
+ * not worked by anybody, it belongs to the deal that produced it. Deriving the
+ * scope from the lead means a handover moves the commercial records with it,
+ * and there is no second place for a visibility rule to be wrong.
+ *
+ * `isDeleted` is folded in here rather than left to the caller. A soft-deleted
+ * lead's invoices are not a separate question from the lead — every one of
+ * these lists would otherwise need to remember it, and the one that forgot
+ * would be showing rows from a deal nobody can open.
+ */
+export async function leadChildVisibilityFilter(user: CurrentUser) {
+  const ids = await visibleUserIds(user)
+
+  if (ids === null) return { lead: { isDeleted: false } }
+
+  return {
+    lead: {
+      isDeleted: false,
+      OR: [{ generatedById: { in: ids } }, { assignedToId: { in: ids } }],
+    },
+  }
+}
+
 /** Same idea for staffing requirements, which are owned by a recruiter/BDM. */
 export async function requirementVisibilityFilter(user: CurrentUser) {
   const ids = await visibleUserIds(user)

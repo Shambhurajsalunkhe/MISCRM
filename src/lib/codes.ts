@@ -110,6 +110,30 @@ export function nextCandidateCode(tx: TransactionClient): Promise<string> {
   return nextSequenceCode(tx, 'candidate', 'CAND')
 }
 
+/**
+ * The three commercial documents, each on its own company-wide counter.
+ *
+ * Separate counters rather than one shared "document" sequence, because these
+ * numbers leave the building. A quotation and the invoice raised against it are
+ * two things the client files separately, and `QT-0007` / `INV-0007` reading as
+ * a matched pair when they are unrelated is worse than either being sparse.
+ *
+ * They are not per-vertical for the same reason requirement codes are not
+ * per-lead: an invoice is chased, queried and reconciled on its own, and two of
+ * them sharing a number identifies nothing.
+ */
+export function nextQuotationCode(tx: TransactionClient): Promise<string> {
+  return nextSequenceCode(tx, 'quotation', 'QT')
+}
+
+export function nextContractCode(tx: TransactionClient): Promise<string> {
+  return nextSequenceCode(tx, 'contract', 'CTR')
+}
+
+export function nextInvoiceCode(tx: TransactionClient): Promise<string> {
+  return nextSequenceCode(tx, 'invoice', 'INV')
+}
+
 // A `syncClientSequence` helper lived here to fast-forward the counter past
 // pre-existing clients. It was never called, and it read-then-wrote without a
 // transaction, so two callers could have moved the counter *backwards* and

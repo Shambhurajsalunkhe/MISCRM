@@ -300,6 +300,7 @@ model User {
   candidatesCreated     Candidate[]            @relation("CandidateCreatedBy")
   submissionsMade       CandidateSubmission[]  @relation("SubmittedBy")
   demosConducted        Demo[]                 @relation("DemoOwner")
+  placementsReversed    Placement[]            @relation("PlacementReversedBy")
   documentsUploaded     Document[]
   paymentsRecorded      Payment[]
   auditLogs             AuditLog[]
@@ -1037,10 +1038,20 @@ model Placement {
   marginPerMonth Decimal? @db.Decimal(14, 2)
   guaranteePeriodDays Int?
 
+  /// A candidate who withdrew after joining, or a client who terminated inside
+  /// the guarantee period. Recorded rather than deleted: the row is what Won
+  /// Revenue sums and what invoices were raised against, so a placement that
+  /// stops counting has to keep saying that it happened and why it stopped.
+  /// Every revenue query reads `reversedAt: null` (see src/lib/commercials).
+  reversedAt     DateTime?
+  reversedById   String?
+  reversalReason String?
+
   submission  CandidateSubmission @relation(fields: [submissionId], references: [id])
   requirement Requirement         @relation(fields: [requirementId], references: [id])
   lead        Lead                @relation(fields: [leadId], references: [id])
   candidate   Candidate           @relation(fields: [candidateId], references: [id])
+  reversedBy  User?               @relation("PlacementReversedBy", fields: [reversedById], references: [id])
   invoices    Invoice[]
 
   createdAt DateTime @default(now())
@@ -1049,6 +1060,7 @@ model Placement {
   @@index([requirementId])
   @@index([leadId])
   @@index([joiningDate])
+  @@index([reversedAt])
 }
 
 // =============================================================================

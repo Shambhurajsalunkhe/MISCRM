@@ -35,6 +35,9 @@ export async function GET(
       requirementId: true,
       candidateId: true,
       submissionId: true,
+      quotationId: true,
+      contractId: true,
+      invoiceId: true,
     },
   })
 

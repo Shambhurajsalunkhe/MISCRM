@@ -109,7 +109,6 @@ type VerticalSeed = {
   usesDemos?: boolean
   usesQuotations?: boolean
   usesContracts?: boolean
-  usesInvoicing?: boolean
   metrics: MetricSeed[]
   stages: StageSeed[]
 }
@@ -262,7 +261,6 @@ const VERTICALS: VerticalSeed[] = [
     colorHex: '#0EA5E9',
     usesRequirements: true,
     usesCandidates: true,
-    usesInvoicing: true,
     metrics: [
       { key: 'CLIENT_OUTREACH', label: 'Client Outreach', isLeadTrigger: true },
     ],
@@ -289,7 +287,6 @@ const VERTICALS: VerticalSeed[] = [
     leadPrefix: 'DM',
     colorHex: '#EC4899',
     usesContracts: true,
-    usesInvoicing: true,
     metrics: [
       { key: 'CAMPAIGNS_RUN', label: 'Campaigns Run' },
       {
@@ -340,7 +337,6 @@ const VERTICALS: VerticalSeed[] = [
     colorHex: '#DC2626',
     usesDemos: true,
     usesQuotations: true,
-    usesInvoicing: true,
     metrics: [],
     stages: [
       {
@@ -510,10 +506,31 @@ async function seedMasterData() {
   for (const [index, vertical] of VERTICALS.entries()) {
     const { metrics, stages, ...verticalData } = vertical
 
+    // Same reasoning as the stage flags below: spreading the literal would omit
+    // an absent optional, so a module switched off here could never be switched
+    // off in a database that already had it on.
+    //
+    // `usesInvoicing` is not in the seed literal at all — Q11 was answered on
+    // 16 Aug 2026 with invoicing enabled for *every* vertical (docs/02 §5), so
+    // there is nothing per-vertical left to say. It stays a column rather than
+    // becoming a constant because an administrator turning it off for one
+    // vertical has to remain a supported act; what the seed asserts is only the
+    // starting position.
+    const verticalRow = {
+      ...verticalData,
+      sortOrder: index,
+      usesRequirements: vertical.usesRequirements ?? false,
+      usesCandidates: vertical.usesCandidates ?? false,
+      usesDemos: vertical.usesDemos ?? false,
+      usesQuotations: vertical.usesQuotations ?? false,
+      usesContracts: vertical.usesContracts ?? false,
+      usesInvoicing: true,
+    }
+
     const saved = await prisma.salesVertical.upsert({
       where: { code: vertical.code },
-      update: { ...verticalData, sortOrder: index },
-      create: { ...verticalData, sortOrder: index },
+      update: verticalRow,
+      create: verticalRow,
     })
 
     for (const [stageIndex, stage] of stages.entries()) {

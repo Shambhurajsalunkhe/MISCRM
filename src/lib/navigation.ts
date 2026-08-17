@@ -57,6 +57,16 @@ export const NAVIGATION: NavSection[] = [
     heading: 'Commercials',
     items: [
       {
+        label: 'Quotations',
+        href: '/quotations',
+        permission: PERMISSIONS.COMMERCIAL_MANAGE,
+      },
+      {
+        label: 'Contracts',
+        href: '/contracts',
+        permission: PERMISSIONS.COMMERCIAL_MANAGE,
+      },
+      {
         label: 'Invoices',
         href: '/invoices',
         permission: PERMISSIONS.COMMERCIAL_MANAGE,

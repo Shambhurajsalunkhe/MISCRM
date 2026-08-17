@@ -361,11 +361,16 @@ Phase 6 has no special cases: `Collected + Pending` reconciles to `Won Revenue`
 for all eight verticals, every revenue report means the same thing everywhere,
 and no screen has to carry an asterisk explaining which channels it covers.
 
-**What Phase 5 has to do about it:** flip `usesInvoicing` on for the remaining
-five in the seed, and treat the flag as the only thing that decides whether a
-lead exposes invoicing — never a list of vertical codes, the same rule the lead
-form and the funnel builder already follow. An administrator turning it back off
-for one vertical is then a supported act rather than a broken report.
+**Done in Phase 5.** `usesInvoicing` was flipped on for the remaining five in
+the seed *and* in a data migration, because the seed only runs where somebody
+re-seeds it and the flag had to move on databases already carrying leads. The
+flag is the only thing that decides whether a lead exposes invoicing — never a
+list of vertical codes, the same rule the lead form and the funnel builder
+already follow — so an administrator turning it back off for one vertical is a
+supported act rather than a broken report. The three figures themselves are
+computed in one place,
+[`src/lib/commercials/revenue.ts`](../src/lib/commercials/revenue.ts), and a
+lead's Commercials tab names the gap between Won and Invoiced where one exists.
 
 ---
 

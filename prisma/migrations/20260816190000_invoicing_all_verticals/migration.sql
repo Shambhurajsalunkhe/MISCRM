@@ -1,0 +1,14 @@
+-- Q11, answered 16 Aug 2026: invoicing is enabled for every vertical, not only
+-- Digital Marketing, Product Sales and Staffing (docs/02-funnels-and-metrics.md
+-- §5). Without this, five verticals — Upwork, LinkedIn, Email, Cold Calling and
+-- Other Sources — would report Won Revenue with no Collected or Pending Revenue
+-- behind it, and `Collected + Pending` would never reconcile to `Won Revenue`.
+--
+-- A data migration rather than a seed change alone: the seed only runs against
+-- databases someone re-seeds, and the flag has to move on the ones already
+-- carrying real leads.
+--
+-- This deliberately does not touch the other module switches. Requirements,
+-- demos, quotations and contracts stay per-vertical; invoicing is the one that
+-- was decided to be universal.
+UPDATE "SalesVertical" SET "usesInvoicing" = true WHERE "usesInvoicing" = false;

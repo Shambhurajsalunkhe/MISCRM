@@ -5,6 +5,7 @@ import { can } from '@/lib/authz'
 import { PERMISSIONS } from '@/lib/permissions'
 import {
   clientVisibilityFilter,
+  leadChildVisibilityFilter,
   leadVisibilityFilter,
   requirementVisibilityFilter,
 } from '@/lib/visibility'
@@ -58,6 +59,9 @@ export type ResolvedTarget = {
     | { requirementId: string }
     | { candidateId: string }
     | { submissionId: string }
+    | { quotationId: string }
+    | { contractId: string }
+    | { invoiceId: string }
 }
 
 /**
@@ -166,6 +170,71 @@ export async function resolveTarget(
     }
   }
 
+  // The three commercial documents. Each is scoped through its lead — none of
+  // them carries an owner, and an invoice belongs to the deal that produced it
+  // rather than to whoever raised it (see `leadChildVisibilityFilter`).
+  //
+  // `commercial.manage` gates them for the same reason the staffing permission
+  // gates candidates: without it, an administrator who took the capability away
+  // would still leave that person able to attach files to any quotation and —
+  // through /api/documents/[id], which resolves the same targets — download
+  // every signed contract in the company.
+  if (
+    target.kind === 'quotation' ||
+    target.kind === 'contract' ||
+    target.kind === 'invoice'
+  ) {
+    if (!(await can(user, PERMISSIONS.COMMERCIAL_MANAGE))) return null
+
+    const scope = await leadChildVisibilityFilter(user)
+
+    if (target.kind === 'quotation') {
+      const quotation = await prisma.quotation.findFirst({
+        where: { id: target.id, ...scope },
+        select: { id: true, quoteNumber: true },
+      })
+
+      if (!quotation) return null
+
+      return {
+        target,
+        label: quotation.quoteNumber,
+        path: `/quotations/${quotation.id}`,
+        link: { quotationId: quotation.id },
+      }
+    }
+
+    if (target.kind === 'contract') {
+      const contract = await prisma.contract.findFirst({
+        where: { id: target.id, ...scope },
+        select: { id: true, contractNumber: true },
+      })
+
+      if (!contract) return null
+
+      return {
+        target,
+        label: contract.contractNumber,
+        path: `/contracts/${contract.id}`,
+        link: { contractId: contract.id },
+      }
+    }
+
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: target.id, ...scope },
+      select: { id: true, invoiceNumber: true },
+    })
+
+    if (!invoice) return null
+
+    return {
+      target,
+      label: invoice.invoiceNumber,
+      path: `/invoices/${invoice.id}`,
+      link: { invoiceId: invoice.id },
+    }
+  }
+
   // Candidate — see the module comment. The permission is the whole gate here,
   // because there is no row scope behind it.
   if (!(await can(user, PERMISSIONS.STAFFING_CANDIDATE_MANAGE))) return null
@@ -210,11 +279,20 @@ export function targetFromRow(row: {
   requirementId?: string | null
   candidateId?: string | null
   submissionId?: string | null
+  quotationId?: string | null
+  contractId?: string | null
+  invoiceId?: string | null
 }): AttachmentTarget | null {
-  if (row.leadId) return { kind: 'lead', id: row.leadId }
-  if (row.clientId) return { kind: 'client', id: row.clientId }
+  // The commercial parents are read first. A document attached to an invoice
+  // carries no `leadId` of its own, but if one is ever set as well, the invoice
+  // is the more specific answer and the page the user came from.
+  if (row.quotationId) return { kind: 'quotation', id: row.quotationId }
+  if (row.contractId) return { kind: 'contract', id: row.contractId }
+  if (row.invoiceId) return { kind: 'invoice', id: row.invoiceId }
+  if (row.submissionId) return { kind: 'submission', id: row.submissionId }
   if (row.requirementId) return { kind: 'requirement', id: row.requirementId }
   if (row.candidateId) return { kind: 'candidate', id: row.candidateId }
-  if (row.submissionId) return { kind: 'submission', id: row.submissionId }
+  if (row.leadId) return { kind: 'lead', id: row.leadId }
+  if (row.clientId) return { kind: 'client', id: row.clientId }
   return null
 }

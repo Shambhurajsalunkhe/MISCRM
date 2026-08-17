@@ -10,6 +10,7 @@ import { MANUAL_ACTIVITY_TYPES } from '@/lib/activity-types'
 import { optionalDate, optionalText } from '@/lib/form-fields'
 import { PERMISSIONS } from '@/lib/permissions'
 import { resolveTarget, targetFromFormData, targetFromRow } from '@/lib/attachments'
+import { isActivityKind } from '@/lib/attachment-kinds'
 import {
   actionError,
   actionSuccess,
@@ -44,6 +45,15 @@ export async function logActivityAction(
   return withAudit(PERMISSIONS.ACTIVITY_MANAGE, async (actor) => {
     const target = targetFromFormData(formData)
     if (!target) return actionError('Missing the record to attach this to.')
+
+    // `Document` has a column for all eight parents; `Activity` has four. No
+    // screen offers a timeline on the other four, so this only ever fires for a
+    // hand-crafted request — but without it that request reaches Prisma with an
+    // unknown column and comes back as a generic failure, which is the wrong
+    // way to learn that a parent was never supported.
+    if (!isActivityKind(target.kind)) {
+      return actionError('Activities cannot be logged against that record.')
+    }
 
     const parsed = activitySchema.safeParse(formValues(formData))
     if (!parsed.success) return fromZodError(parsed.error)

@@ -204,6 +204,37 @@ export default async function LeadLayout({
                 },
               ]
             : []),
+          // Product Sales only, and Digital Marketing gets contracts — all three
+          // read the vertical's own module switches, never a list of codes.
+          // Q11 turned invoicing on everywhere (docs/02 §5), so the Commercials
+          // tab is on every lead; the other two stay where their module is.
+          ...(lead.vertical.usesDemos
+            ? [
+                {
+                  label: 'Demos',
+                  href: `${base}/demos`,
+                  count: lead._count.demos,
+                },
+              ]
+            : []),
+          ...(lead.vertical.usesQuotations
+            ? [
+                {
+                  label: 'Quotations',
+                  href: `${base}/quotations`,
+                  count: lead._count.quotations,
+                },
+              ]
+            : []),
+          ...(lead.vertical.usesContracts || lead.vertical.usesInvoicing
+            ? [
+                {
+                  label: 'Commercials',
+                  href: `${base}/commercials`,
+                  count: lead._count.contracts + lead._count.invoices,
+                },
+              ]
+            : []),
           {
             label: 'Timeline',
             href: `${base}/timeline`,

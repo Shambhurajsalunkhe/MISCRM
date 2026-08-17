@@ -99,6 +99,13 @@ export const loadLead = cache(async (user: CurrentUser, id: string) => {
           // would read as requirements having been deleted. The tab itself
           // re-queries through the scope and says how many it is not showing.
           requirements: true,
+          // The commercial tabs need no such caveat: demos, quotations,
+          // contracts and invoices are all scoped through this very lead, so
+          // anyone reading the badge can open every row behind it.
+          demos: true,
+          quotations: true,
+          contracts: true,
+          invoices: true,
         },
       },
     },

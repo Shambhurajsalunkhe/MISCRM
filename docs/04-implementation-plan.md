@@ -298,12 +298,95 @@ list of optional props. Requirements, candidates and submissions got timelines,
 documents and authorised downloads with no change to either server action beyond
 the parent lookup.
 
-### Phase 5 — Product Sales, Digital Marketing & money
+### Phase 5 — Product Sales, Digital Marketing & money — **done**
 Demos and quotations with line items. Contracts. Invoices, payments, the four
 payment statuses, and the overdue sweep. Won / Collected / Pending revenue
 computed everywhere it appears.
 
 *Ends with:* all eight verticals live and revenue is real.
+
+Delivered: `/quotations` (+ `/new`, `/[id]` with its line-item editor),
+`/contracts` (+ `/new`, `/[id]`), `/invoices` (+ `/new`, `/[id]` with
+record-payment), three new lead tabs — Demos, Quotations and Commercials —
+`/api/jobs/overdue-invoices` for a scheduler, placement reversal on
+`/placements`, and quotation, contract and invoice numbers in global search.
+
+**Q11 is now in the database, not only on paper.** `usesInvoicing` is `true` for
+all eight verticals — a seed change *and* a data migration, because the seed
+only runs where somebody re-seeds it and the flag had to move on databases
+already carrying leads. Nothing reads a list of vertical codes: the switch is
+the only thing that decides whether a lead exposes invoicing, so an
+administrator turning it off for one vertical stays a supported act.
+
+**Six decisions taken during the build:**
+
+- **Money is added up in integer cents, never in floats.**
+  [`src/lib/commercials/money.ts`](../src/lib/commercials/money.ts) is four
+  functions long and exists because of one bug: three payments of `33.33`
+  against a total of `99.99` leave a `PARTIALLY_PAID` invoice a cent short for
+  ever, and nobody can see why. Every sum and comparison in this area goes
+  through it, and only the result becomes a decimal again.
+- **Invoice status is derived twice, on purpose.** It is written to the column
+  on every payment so the indexed queries the dashboard will use in Phase 6 stay
+  honest, *and* recomputed at render time so a screen never says Pending about
+  an invoice that fell due overnight. The two agree except inside that window —
+  and a collections register that is wrong for a morning because a cron missed a
+  night is worse than one with no chip at all. `OVERDUE` beats `PARTIALLY_PAID`
+  in the precedence, because [`01` §3](01-data-model.md) defines it on
+  `amountPending > 0` rather than on nothing having been received.
+- **The overdue sweep is an endpoint, not an in-process schedule.** The plan puts
+  node-cron in Phase 7 with the follow-up and aging jobs, and Q7 — the hosting
+  target — is what decides whether a process-resident timer can run at all.
+  `POST /api/jobs/overdue-invoices` takes a `CRON_SECRET` bearer token or an
+  administrator's session, and the same function sits behind a button on the
+  register. It is idempotent, so running it twice and missing a night come out
+  the same. Phase 7 can call it in-process without this route changing.
+- **Overpayment is refused rather than clamped.** `amountPending` feeds Pending
+  Revenue for the whole company, and an invoice recording more received than it
+  ever billed would quietly reduce that number by the difference — a figure
+  nobody could trace back to a keying error on one row. If the client really did
+  send more, the invoice is what was wrong.
+- **Accepting a quotation fills the lead's deal value, but only if it is
+  blank.** Product Sales books Won Revenue off `Lead.dealValue`
+  ([`02` §5](02-funnels-and-metrics.md)), and the accepted quote is the only
+  place that number was ever agreed; left to be re-typed later it gets re-typed
+  differently, or not at all, and the vertical reports a won deal worth nothing.
+  Overwriting a value somebody set by hand would be this action deciding
+  something it was not asked to decide, so it only ever fills a blank — and it
+  needs `lead.commercial`, which is a separate permission, so the acceptance
+  still succeeds without it and the screen says the deal value was left alone.
+- **A quotation's figures freeze once it is accepted, rejected or expired; a
+  contract's never do.** They are different documents. A quote is an offer that
+  was sent on a particular day, and editing its lines afterwards rewrites what
+  the client saw — the honest move is a new quotation. A contract on new terms in
+  month seven is the same agreement, and the invoices already raised keep their
+  own amounts, which is why contract value is not a sum of its invoices and the
+  register shows both columns side by side.
+
+**Reversing a placement is defined**, which is what Phase 4 left open.
+[`src/lib/staffing/placement.ts`](../src/lib/staffing/placement.ts) writes a
+reversal rather than deleting the row: `reversedAt`, a mandatory reason and who
+did it, with every revenue query reading `reversedAt: null`. So Won Revenue
+drops by the right amount and the reason it dropped is a row anybody can open.
+Three things follow — the opening comes back and the requirement's status is
+re-derived from it; the reversal is **refused while any non-cancelled invoice
+stands against the placement**, because un-booking revenue that is still being
+billed would leave Collected Revenue pointing at work the system says never
+happened; and it is terminal for that submission, since `Placement.submissionId`
+is unique. A candidate who joins, leaves and rejoins is submitted again, which
+is the honest reading anyway. It takes `staffing.requirement.manage` *and*
+`commercial.manage`: a recruiter can record the join, but taking money back off
+the board is the account owner's call.
+
+**One latent hole closed while extending attachments.** `Document` has a
+nullable column for all eight parents and `Activity` has four, so
+`ACTIVITY_KINDS` now names the difference and `logActivityAction` refuses a
+parent it cannot write. Only a hand-crafted request ever reached it — no screen
+offers a timeline on the other four — but it previously arrived at Prisma as an
+unknown column and came back as "something went wrong" to someone who had done
+nothing wrong. Quotations, contracts and invoices joined as documents-only
+parents, gated on `commercial.manage` and scoped through their lead by the new
+`leadChildVisibilityFilter`, which all four commercial record types share.
 
 ### Phase 6 — Dashboard, reports & analytics
 The Sales Head dashboard exactly as your flowchart draws it. All eleven reports.
@@ -419,10 +502,10 @@ Phase 2 review fixed before this phase started.
   the period rather than an aggregate. Phase 6 is where all three levels get
   converted to `GROUP BY` together, because that is when they start being
   computed for eight verticals at once.
-- **Reversing a placement is Phase 5's to define.** The refusal above is the
-  right answer today; it stops being one once there are invoices to credit.
-  Whatever Phase 5 builds should be a reversal that writes its own record, not a
-  delete.
+- ~~**Reversing a placement is Phase 5's to define.**~~ Closed: it writes its own
+  record, keeps the row, and refuses while an invoice still stands against the
+  placement — see Phase 5 above. The submission board still refuses the stage
+  move, but it now refuses *towards somewhere*.
 - **`Requirement` has no assignment-history table**, so a handover shows in the
   audit trail as a field change rather than in a table of its own — which is why
   the requirement's History tab has two sections where the lead's has three. A
@@ -448,3 +531,33 @@ Phase 2 review fixed before this phase started.
   "not moved in 14 days" instead, and the requirement header shows the real
   per-stage threshold. Worth unifying with the Pipeline Aging report in Phase 6,
   which faces the same problem one level up.
+
+### Carried into Phase 6 from the Phase 5 build
+
+- **No commercial list paginates**, matching every other list in the app: 100
+  quotations, 100 contracts, 100 invoices, and a footer that says so. Same
+  answer as before — revisit alongside Q5, which Phase 6 has to settle anyway.
+- **The invoice register's totals are four aggregate queries per render.**
+  Correct and indexed, but the dashboard is about to want the same three figures
+  across every vertical at once. That is the same conversation as `reached()`
+  and `subReached()`, and all of it belongs in one pass rather than three.
+- **`/invoices/new` only offers the "bills for" picker once a lead is fixed**,
+  because the answers come from that lead. Starting from the register with no
+  lead in hand raises an invoice against the deal itself. The full route in is
+  the lead's Commercials tab, a contract, a quotation or a placement — each of
+  which pre-selects itself. A lead typeahead would collapse the two paths, and
+  is the same missing control the lead form's client picker wants.
+- **A quotation has no expiry job.** `validUntil` is shown, and a quote past it
+  is flagged on the detail page, but nothing moves it to `EXPIRED` — that stays
+  a decision somebody takes, because a client coming back a week late is
+  normal and auto-expiring the document would refuse an order that is still
+  live. If it should be automatic, it belongs beside the overdue sweep.
+- **No commercial screen exports.** Same answer as the funnel and the staffing
+  report: Excel and PDF arrive with the reports in Phase 6, which is also where
+  `/reports/revenue` and `/reports/payments` land — the two reports that read
+  precisely the figures this phase started maintaining.
+- **`Payment` has no partial-refund shape.** A receipt can be removed if it was
+  keyed in error, and an invoice can be cancelled before anything is collected,
+  but money that arrived and then went back out has nowhere to go. Nothing needs
+  it yet; the placement reversal is the case that would have, and it refuses
+  while a live invoice exists precisely so this gap cannot be reached silently.

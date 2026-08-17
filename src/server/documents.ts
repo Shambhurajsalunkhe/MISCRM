@@ -114,6 +114,9 @@ export async function deleteDocumentAction(
         requirementId: true,
         candidateId: true,
         submissionId: true,
+        quotationId: true,
+        contractId: true,
+        invoiceId: true,
       },
     })
     if (!document) return actionError('That document no longer exists.')

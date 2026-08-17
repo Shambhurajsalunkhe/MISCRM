@@ -10,8 +10,26 @@ function isPublicPath(pathname: string): boolean {
   )
 }
 
+/**
+ * Endpoints that authenticate themselves rather than by session cookie.
+ *
+ * The scheduled-job routes take an `Authorization: Bearer <CRON_SECRET>` header
+ * — a scheduler has no cookie jar — and check it in the handler. Without this
+ * exemption they would be redirected to /login with a 302, which a cron would
+ * happily record as a successful call while the sweep never ran.
+ *
+ * This grants nothing on its own: every route under here refuses an unsigned
+ * request itself, and answers 401 rather than redirecting.
+ */
+const SELF_AUTHENTICATING_PREFIX = '/api/jobs/'
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  if (pathname.startsWith(SELF_AUTHENTICATING_PREFIX)) {
+    return NextResponse.next()
+  }
+
   const session = await verifySession(
     request.cookies.get(SESSION_COOKIE)?.value,
   )

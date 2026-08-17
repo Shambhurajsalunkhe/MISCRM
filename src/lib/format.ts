@@ -37,6 +37,20 @@ export function toDateInputValue(value: Date | null | undefined): string {
   return `${value.getFullYear()}-${month}-${day}`
 }
 
+/**
+ * `yyyy-MM-ddTHH:mm`, for `<input type="datetime-local">` round-trips.
+ *
+ * Local parts throughout, never `toISOString()`: that renders UTC, so a demo at
+ * 09:00 in Delhi comes back into the control as 03:30 and saves itself five and
+ * a half hours earlier every time somebody opens the form.
+ */
+export function toDateTimeInputValue(value: Date | null | undefined): string {
+  if (!value) return ''
+  const hours = String(value.getHours()).padStart(2, '0')
+  const minutes = String(value.getMinutes()).padStart(2, '0')
+  return `${toDateInputValue(value)}T${hours}:${minutes}`
+}
+
 export function formatMoney(
   value: DecimalLike,
   symbol = '$',

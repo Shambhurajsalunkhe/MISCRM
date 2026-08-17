@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/field'
 import { EmptyState, PageHeader } from '@/components/ui/page'
 import { Stat, StatRow } from '@/components/ui/stat'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
+import { ReversePlacementControl } from './reverse-control'
 
 export const metadata = { title: 'Placements · Sales CRM' }
 
@@ -61,7 +62,7 @@ export default async function PlacementsPage({
       : {}),
   }
 
-  const [placements, totals, symbol, canSeeRevenue] = await Promise.all([
+  const [placements, totals, symbol, canSeeRevenue, canReverse] = await Promise.all([
     prisma.placement.findMany({
       where,
       select: {
@@ -72,6 +73,9 @@ export default async function PlacementsPage({
         billRate: true,
         marginPerMonth: true,
         guaranteePeriodDays: true,
+        reversedAt: true,
+        reversalReason: true,
+        reversedBy: { select: { name: true } },
         candidate: { select: { id: true, fullName: true, candidateCode: true } },
         requirement: {
           select: {
@@ -88,14 +92,23 @@ export default async function PlacementsPage({
       orderBy: { joiningDate: 'desc' },
       take: PAGE_SIZE,
     }),
+    // Reversed placements are listed but never totalled. Somebody who withdrew
+    // after joining is part of the record of what happened on that requirement,
+    // and hiding the row would make the drop in Won Revenue unattributable —
+    // which is the whole reason a reversal is a record rather than a delete.
     prisma.placement.aggregate({
-      where,
+      where: { ...where, reversedAt: null },
       _count: { _all: true },
       _sum: { placementValue: true, marginPerMonth: true },
     }),
     currencySymbol(),
     can(viewer, PERMISSIONS.REPORT_REVENUE),
+    can(viewer, PERMISSIONS.COMMERCIAL_MANAGE),
   ])
+
+  const reversedCount = placements.filter(
+    (placement) => placement.reversedAt !== null,
+  ).length
 
   return (
     <div className="space-y-5">
@@ -138,7 +151,15 @@ export default async function PlacementsPage({
       </form>
 
       <StatRow>
-        <Stat label="Placements" value={String(totals._count._all)} />
+        <Stat
+          label="Placements"
+          value={String(totals._count._all)}
+          hint={
+            reversedCount > 0
+              ? `${reversedCount} reversed, excluded from these figures`
+              : undefined
+          }
+        />
         {canSeeRevenue ? (
           <>
             <Stat
@@ -178,21 +199,44 @@ export default async function PlacementsPage({
                   </>
                 ) : null}
                 <TH className="text-right">Guarantee</TH>
+                {canReverse ? (
+                  <TH>
+                    <span className="sr-only">Actions</span>
+                  </TH>
+                ) : null}
               </TR>
             </THead>
             <TBody>
               {placements.map((placement) => (
-                <TR key={placement.id}>
+                <TR
+                  key={placement.id}
+                  className={placement.reversedAt ? 'bg-slate-50' : undefined}
+                >
                   <TD>
                     <a
                       href={`/requirements/${placement.requirement.id}/submissions/${placement.submission.id}`}
-                      className="font-medium text-slate-900 hover:underline"
+                      className={
+                        placement.reversedAt
+                          ? 'font-medium text-slate-500 line-through hover:underline'
+                          : 'font-medium text-slate-900 hover:underline'
+                      }
                     >
                       {placement.candidate.fullName}
                     </a>
                     <div className="text-xs text-slate-500">
                       {placement.candidate.candidateCode}
                     </div>
+                    {placement.reversedAt ? (
+                      <div className="mt-1 max-w-56 text-xs text-red-700">
+                        Reversed {formatDate(placement.reversedAt)}
+                        {placement.reversedBy
+                          ? ` by ${placement.reversedBy.name}`
+                          : ''}
+                        {placement.reversalReason
+                          ? ` — ${placement.reversalReason}`
+                          : ''}
+                      </div>
+                    ) : null}
                   </TD>
                   <TD>
                     <a
@@ -245,17 +289,35 @@ export default async function PlacementsPage({
                       ? `${placement.guaranteePeriodDays} d`
                       : '—'}
                   </TD>
+                  {canReverse ? (
+                    <TD>
+                      {placement.reversedAt ? null : (
+                        <ReversePlacementControl
+                          placementId={placement.id}
+                          candidateName={placement.candidate.fullName}
+                        />
+                      )}
+                    </TD>
+                  ) : null}
                 </TR>
               ))}
             </TBody>
           </Table>
 
           <p className="text-xs text-slate-500">
-            Showing {placements.length} of {totals._count._all} placements
-            {totals._count._all > PAGE_SIZE
+            Showing {placements.length} row
+            {placements.length === 1 ? '' : 's'}
+            {placements.length === PAGE_SIZE
               ? ' — narrow the date range to see the rest'
               : ''}
-            . Invoicing against a placement arrives with Phase 5.
+            . {totals._count._all} placement
+            {totals._count._all === 1 ? '' : 's'} in this period count towards
+            the figures above
+            {reversedCount > 0
+              ? `; ${reversedCount} reversed row${reversedCount === 1 ? '' : 's'} shown here do not`
+              : ''}
+            . Raise an invoice against a placement from its lead&rsquo;s
+            Commercials tab.
           </p>
         </>
       )}

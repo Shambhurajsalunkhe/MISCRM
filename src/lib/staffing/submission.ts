@@ -112,11 +112,14 @@ export async function changeSubmissionStage(input: {
     }
 
     // Undoing a placement is a revenue event, not a stage correction: the
-    // `Placement` row is what Won Revenue sums, and Phase 5 will invoice
-    // against it. Deleting one quietly from a stage dropdown would change a
-    // number on the dashboard with nothing to explain it. A candidate who
-    // withdraws after joining needs a reversal that Phase 5 defines; until
-    // then, the honest answer is to refuse and say why.
+    // `Placement` row is what Won Revenue sums, and invoices are raised against
+    // it. Deleting one quietly from a stage dropdown would change a number on
+    // the dashboard with nothing to explain it.
+    //
+    // Phase 5 defined the alternative rather than leaving the refusal absolute:
+    // `reversePlacement` in src/lib/staffing/placement.ts writes a reversal, on
+    // the placement register, with a mandatory reason and the invoices checked
+    // first. This still refuses, but it now refuses towards somewhere.
     //
     // The current *stage* is checked as well as the placement row, so a move
     // from one placed stage to another is refused too. Without it, a second
@@ -126,7 +129,7 @@ export async function changeSubmissionStage(input: {
     if (submission.placement || submission.currentStage.isPlaced) {
       return {
         ok: false as const,
-        message: `${submission.candidate.fullName} has a placement recorded against this requirement. Reversing a placement changes booked revenue and is not something this screen can undo.`,
+        message: `${submission.candidate.fullName} has a placement recorded against this requirement. Reversing it changes booked revenue, so it is done from the placement register with a reason attached rather than from a stage dropdown.`,
         field: 'toStageId',
       }
     }
