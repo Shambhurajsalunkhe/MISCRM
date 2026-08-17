@@ -15,6 +15,9 @@
 
 # next.js
 /.next/
+# An alternative build output, for building while a dev server holds /.next open
+# (NEXT_DIST_DIR in next.config.ts).
+/.next-build/
 /out/
 
 # production

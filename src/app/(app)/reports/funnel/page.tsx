@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/db'
-import { pageAccess } from '@/lib/authz'
+import { can, pageAccess } from '@/lib/authz'
 import { PERMISSIONS } from '@/lib/permissions'
 import {
   pickReportFilters,
+  reportFilterQuery,
   resolvePeople,
   resolveRange,
 } from '@/lib/prospecting/filters'
@@ -17,6 +18,7 @@ import {
 import { loggablePeople } from '@/lib/prospecting/people'
 import { formatCounterDate } from '@/lib/prospecting/dates'
 import { AccessDenied } from '@/components/access-denied'
+import { ExportButtons } from '@/components/export-buttons'
 import { FunnelSteps } from '@/components/funnel-steps'
 import { ReportFilterBar } from '@/components/report-filters'
 import { ButtonLink } from '@/components/ui/button'
@@ -91,7 +93,7 @@ export default async function FunnelReportPage({
   const vertical =
     verticals.find((row) => row.id === filters.vertical) ?? verticals[0]
 
-  const [counters, leadsByVertical, reached, staff, teams] = await Promise.all([
+  const [counters, leadsByVertical, reached, staff, teams, canExport] = await Promise.all([
     counterTotals(range, people, vertical.id),
     leadsCreatedByVertical(range, people, vertical.id),
     reachedByStage(range, people, vertical.id),
@@ -101,6 +103,7 @@ export default async function FunnelReportPage({
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
+    can(viewer, PERMISSIONS.DATA_EXPORT),
   ])
 
   const funnel = buildFunnel(
@@ -140,9 +143,17 @@ export default async function FunnelReportPage({
         title={`${vertical.name} funnel`}
         description="Counters above the line, leads below it, and the conversion at every step."
         actions={
-          <ButtonLink href="/prospecting/summary" variant="secondary">
-            Counter summary
-          </ButtonLink>
+          <div className="flex gap-2">
+            <ButtonLink href="/prospecting/summary" variant="secondary">
+              Counter summary
+            </ButtonLink>
+            {canExport ? (
+              <ExportButtons
+                report="funnel"
+                query={reportFilterQuery({ ...filters, vertical: vertical.id })}
+              />
+            ) : null}
+          </div>
         }
       />
 

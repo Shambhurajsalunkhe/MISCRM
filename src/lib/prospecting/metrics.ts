@@ -4,11 +4,10 @@ import { prisma } from '@/lib/db'
 import {
   counterWhere,
   leadWhereForPeriod,
-  localDayStart,
   type PeopleScope,
   type ResolvedRange,
 } from '@/lib/prospecting/filters'
-import { addDays } from '@/lib/prospecting/dates'
+import { reachedByStageAggregate } from '@/lib/reports/aggregate'
 
 /**
  * The two primitives of docs/02-funnels-and-metrics.md §4, and the funnel each
@@ -62,55 +61,19 @@ export async function leadsCreatedByVertical(
  * and dating it by lead creation would leave last quarter's deals invisible in
  * the month they were actually won.
  *
- * `distinct` on `leadId` matters: a lead pushed back to Negotiation and forward
- * again has two history rows for that stage and is still one lead.
+ * The counting is `COUNT(DISTINCT leadId)` grouped by stage, in
+ * `src/lib/reports/aggregate.ts`. `DISTINCT` is the part that matters: a lead
+ * pushed back to Negotiation and forward again has two history rows for that
+ * stage and is still one lead. Phases 3 and 4 did the distinct-and-count in
+ * memory over every history row in the period; Phase 6 made it an aggregate,
+ * because the dashboard asks the same question for eight verticals at once.
  */
 export async function reachedByStage(
   range: ResolvedRange,
   people: PeopleScope,
   verticalId: string,
 ): Promise<Map<string, number>> {
-  const rows = await prisma.leadStageHistory.findMany({
-    where: {
-      changedAt: {
-        gte: localDayStart(range.from),
-        lt: localDayStart(addDays(range.to, 1)),
-      },
-      toStage: { verticalId },
-      lead: leadStageScope(people),
-    },
-    select: { toStageId: true, leadId: true },
-    distinct: ['toStageId', 'leadId'],
-  })
-
-  const counts = new Map<string, number>()
-  for (const row of rows) {
-    counts.set(row.toStageId, (counts.get(row.toStageId) ?? 0) + 1)
-  }
-  return counts
-}
-
-/**
- * The lead-side scope for a history query.
- *
- * Deliberately *not* `leadWhereForPeriod`: that one dates leads by creation,
- * and a history row is dated by its own `changedAt`. Only the people filters
- * carry over.
- */
-function leadStageScope(people: PeopleScope) {
-  return {
-    isDeleted: false,
-    ...(people.only ? { generatedById: people.only } : {}),
-    ...(people.teamId ? { teamId: people.teamId } : {}),
-    ...(people.visible
-      ? {
-          OR: [
-            { generatedById: { in: people.visible } },
-            { assignedToId: { in: people.visible } },
-          ],
-        }
-      : {}),
-  }
+  return reachedByStageAggregate(range, people, verticalId)
 }
 
 /** `numerator ÷ denominator` as a percentage, or null when there is no base. */

@@ -1,146 +1,200 @@
-import { pageAccess } from '@/lib/authz'
-import { PERMISSIONS } from '@/lib/permissions'
+import { can, pageAccess } from '@/lib/authz'
+import { PERMISSIONS, type Permission } from '@/lib/permissions'
+import {
+  analyticsQuery,
+  pickAnalyticsFilters,
+} from '@/lib/reports/filters'
 import { AccessDenied } from '@/components/access-denied'
 import { PageHeader } from '@/components/ui/page'
 
 export const metadata = { title: 'Reports · Sales CRM' }
 
+type SearchParams = Promise<Record<string, string | string[] | undefined>>
+
 /**
  * The reports index (docs/03 §1).
  *
- * Eleven reports are specified and two are built. The rest are listed as coming
- * rather than hidden, because the sidebar has linked here since Phase 0 and an
- * index that silently showed a single card would read as "this is all there
- * is". Each arrives with the phase that has the data behind it — there is no
- * honest Revenue report before Phase 5 creates an invoice.
+ * All eleven, built. Each card carries whatever filter state the visitor arrived
+ * with — a Sales Head who narrowed the dashboard to August and Upwork stays in
+ * August and Upwork when they open a report, which is what makes the drill-down
+ * chain of README §37 continuous rather than a set of screens that each start
+ * from scratch.
  *
- * A hard-coded list, and each new report has to be added here as well as
- * routed. Worth revisiting if the count grows past this; at eleven, a registry
- * would be more machinery than the problem deserves.
+ * Two of the eleven sit behind their own permissions rather than `report.view`,
+ * per the matrix in docs/03 §2 — the performance reports and the money ones — and
+ * a card the visitor cannot open is not shown. A hard-coded list still, and each
+ * new report has to be added here as well as routed; at eleven that is cheaper
+ * than a registry, and the export registry already keys them by the same names.
  */
 const REPORTS: Array<{
-  href: string | null
+  href: string
   title: string
   description: string
-  phase: string
+  permission: Permission
+  /** Whether the filter state carries over — the two Phase 3/4 reports use their
+   *  own narrower parameter names, so handing them these would silently drop
+   *  half of it and misread the rest. */
+  carriesFilters: boolean
 }> = [
+  {
+    href: '/reports/vertical',
+    title: 'Vertical performance',
+    description:
+      'Every vertical side by side: intake above the line, outcomes below it, and what each was worth.',
+    permission: PERMISSIONS.REPORT_VIEW,
+    carriesFilters: true,
+  },
   {
     href: '/reports/funnel',
     title: 'Vertical funnel',
     description:
       'Counters above the line, the bridge into leads, and stage-to-stage drop-off below it.',
-    phase: 'Phase 3',
+    permission: PERMISSIONS.REPORT_VIEW,
+    carriesFilters: false,
+  },
+  {
+    href: '/reports/lead-source',
+    title: 'Lead source performance',
+    description:
+      'Which sources produce leads, and which produce won deals — rarely the same order.',
+    permission: PERMISSIONS.REPORT_VIEW,
+    carriesFilters: true,
+  },
+  {
+    href: '/reports/bde',
+    title: 'BDE lead generation',
+    description:
+      'Counters logged, leads generated and the bridge between them, per person (README §27).',
+    permission: PERMISSIONS.REPORT_PERFORMANCE,
+    carriesFilters: true,
+  },
+  {
+    href: '/reports/bdm',
+    title: 'BDM conversion',
+    description:
+      'Leads owned, how far each person moved them, and the win rate (README §28).',
+    permission: PERMISSIONS.REPORT_PERFORMANCE,
+    carriesFilters: true,
+  },
+  {
+    href: '/reports/aging',
+    title: 'Pipeline aging',
+    description:
+      'Leads past the threshold set for their own stage, and the stages where deals lose time.',
+    permission: PERMISSIONS.REPORT_VIEW,
+    carriesFilters: true,
+  },
+  {
+    href: '/reports/won-lost',
+    title: 'Won / lost analysis',
+    description:
+      'Deals decided in the period, the lost-reason breakdown, and the sales cycle behind each outcome.',
+    permission: PERMISSIONS.REPORT_VIEW,
+    carriesFilters: true,
+  },
+  {
+    href: '/reports/revenue',
+    title: 'Revenue',
+    description:
+      'Pipeline, Won, Collected and Pending, per vertical and reconciled against what has been invoiced.',
+    permission: PERMISSIONS.REPORT_REVENUE,
+    carriesFilters: true,
+  },
+  {
+    href: '/reports/payments',
+    title: 'Payment status',
+    description:
+      'What was billed, what has arrived, and an ageing ladder over everything still owed.',
+    permission: PERMISSIONS.REPORT_REVENUE,
+    carriesFilters: true,
   },
   {
     href: '/reports/staffing',
     title: 'Staffing',
     description:
       'Requirements, openings, profiles shared, interviews, selections and placements.',
-    phase: 'Phase 4',
+    permission: PERMISSIONS.REPORT_VIEW,
+    carriesFilters: false,
   },
   {
-    href: null,
+    href: '/reports/product-demos',
     title: 'Product demos',
-    description: 'Inquiries, demos, quotations, orders and order value.',
-    phase: 'Phase 5',
-  },
-  {
-    href: null,
-    title: 'Revenue',
-    description: 'Pipeline, Won, Collected and Pending.',
-    phase: 'Phase 5',
-  },
-  {
-    href: null,
-    title: 'Payment status',
-    description: 'Paid, partial, pending and overdue, with the ageing on each.',
-    phase: 'Phase 5',
-  },
-  {
-    href: null,
-    title: 'Lead source performance',
-    description: 'Which sources produce leads, and which produce won deals.',
-    phase: 'Phase 6',
-  },
-  {
-    href: null,
-    title: 'BDE lead generation',
-    description: 'Counters, leads generated and conversion per BDE (README §27).',
-    phase: 'Phase 6',
-  },
-  {
-    href: null,
-    title: 'BDM conversion',
-    description: 'Leads worked, stage progression and win rate per BDM (README §28).',
-    phase: 'Phase 6',
-  },
-  {
-    href: null,
-    title: 'Vertical performance',
-    description: 'The eight verticals side by side.',
-    phase: 'Phase 6',
-  },
-  {
-    href: null,
-    title: 'Pipeline aging',
-    description: 'Leads past their stage threshold, and average time in stage.',
-    phase: 'Phase 6',
-  },
-  {
-    href: null,
-    title: 'Won / lost analysis',
-    description: 'Outcomes with the lost-reason breakdown.',
-    phase: 'Phase 6',
+    description:
+      'Inquiries, demos held, proposals, orders and order value — wherever demos are switched on.',
+    permission: PERMISSIONS.REPORT_VIEW,
+    carriesFilters: true,
   },
 ]
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams
+}) {
   const viewer = await pageAccess(PERMISSIONS.REPORT_VIEW)
   if (!viewer) return <AccessDenied what="reports" />
+
+  const filters = pickAnalyticsFilters(await searchParams)
+  const query = analyticsQuery(filters)
+
+  const [canSeeRevenue, canSeePerformance] = await Promise.all([
+    can(viewer, PERMISSIONS.REPORT_REVENUE),
+    can(viewer, PERMISSIONS.REPORT_PERFORMANCE),
+  ])
+
+  const visible = REPORTS.filter((report) => {
+    if (report.permission === PERMISSIONS.REPORT_REVENUE) return canSeeRevenue
+    if (report.permission === PERMISSIONS.REPORT_PERFORMANCE) {
+      return canSeePerformance
+    }
+    return true
+  })
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Reports"
-        description="Every report is filtered, drills through to the records behind it, and reads the same numbers the dashboard does."
+        description="Every report is filtered, drills through to the records behind it, exports to Excel, PDF and CSV, and reads the same numbers the dashboard does."
       />
 
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {REPORTS.map((report) => {
-          const body = (
-            <>
-              <div className="flex items-start justify-between gap-2">
-                <h2 className="text-sm font-semibold text-slate-900">
-                  {report.title}
-                </h2>
-                {report.href ? null : (
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-                    {report.phase}
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 text-sm text-slate-500">{report.description}</p>
-            </>
-          )
+      {query ? (
+        <p className="text-xs text-slate-500">
+          Carrying the filters you arrived with. Reports that use their own
+          parameter names — the funnel and staffing, which are per vertical and
+          per person rather than per filter set — start fresh, because passing
+          these through would misread half of them.
+        </p>
+      ) : null}
 
-          return (
-            <li key={report.title}>
-              {report.href ? (
-                <a
-                  href={report.href}
-                  className="block h-full rounded-lg border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  {body}
-                </a>
-              ) : (
-                <div className="h-full rounded-lg border border-dashed border-slate-200 bg-white/60 p-4">
-                  {body}
-                </div>
-              )}
-            </li>
-          )
-        })}
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {visible.map((report) => (
+          <li key={report.title}>
+            <a
+              href={
+                report.carriesFilters && query
+                  ? `${report.href}?${query}`
+                  : report.href
+              }
+              className="block h-full rounded-lg border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              <h2 className="text-sm font-semibold text-slate-900">
+                {report.title}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {report.description}
+              </p>
+            </a>
+          </li>
+        ))}
       </ul>
+
+      <p className="text-xs text-slate-500">
+        Numbers on these screens follow three rules, stated on each report: counts
+        are the leads <strong>created</strong> in the period; stage and outcome
+        figures are dated by <strong>when the transition happened</strong>; and
+        pipeline and pending money are <strong>as at today</strong>, whatever the
+        date range says.
+      </p>
     </div>
   )
 }

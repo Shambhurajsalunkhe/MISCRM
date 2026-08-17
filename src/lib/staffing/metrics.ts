@@ -3,6 +3,10 @@ import 'server-only'
 import { prisma } from '@/lib/db'
 import { rate } from '@/lib/prospecting/metrics'
 import {
+  requirementReachedAggregate,
+  subReachedAggregate,
+} from '@/lib/reports/aggregate'
+import {
   localDayStart,
   type PeopleScope,
   type ResolvedRange,
@@ -118,48 +122,22 @@ export async function requirementReachedByStage(
   range: ResolvedRange,
   people: PeopleScope,
 ): Promise<Map<string, number>> {
-  const rows = await prisma.requirementStageHistory.findMany({
-    where: {
-      changedAt: instants(range),
-      requirement: requirementScope(people),
-    },
-    select: { toStageId: true, requirementId: true },
-    distinct: ['toStageId', 'requirementId'],
-  })
-
-  const counts = new Map<string, number>()
-  for (const row of rows) {
-    counts.set(row.toStageId, (counts.get(row.toStageId) ?? 0) + 1)
-  }
-  return counts
+  return requirementReachedAggregate(range, people)
 }
 
 /**
  * `subReached()` — submissions that ever reached each candidate stage.
  *
- * Same read-and-count-in-memory shape as `reached()`, and the same caveat
- * carried forward from Phase 3: correct and indexed on the transition date, but
- * a read of every history row in the period rather than a `GROUP BY`. The
- * obvious thing to convert when Phase 6 runs these for eight verticals at once.
+ * Same shape as `reached()` one level up, and converted with it in Phase 6: both
+ * are now `COUNT(DISTINCT submissionId)` grouped by stage in
+ * `src/lib/reports/aggregate.ts` rather than a read of every history row in the
+ * period counted in memory.
  */
 export async function subReachedByStage(
   range: ResolvedRange,
   people: PeopleScope,
 ): Promise<Map<string, number>> {
-  const rows = await prisma.candidateStageHistory.findMany({
-    where: {
-      changedAt: instants(range),
-      submission: { requirement: requirementScope(people) },
-    },
-    select: { toStageId: true, submissionId: true },
-    distinct: ['toStageId', 'submissionId'],
-  })
-
-  const counts = new Map<string, number>()
-  for (const row of rows) {
-    counts.set(row.toStageId, (counts.get(row.toStageId) ?? 0) + 1)
-  }
-  return counts
+  return subReachedAggregate(range, people)
 }
 
 /** Distinct people put forward in the period — Candidates Sourced. */

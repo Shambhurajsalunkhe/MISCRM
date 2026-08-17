@@ -15,6 +15,10 @@ const eslintConfig = [
     ignores: [
       "node_modules/**",
       ".next/**",
+      // The alternative build output (NEXT_DIST_DIR in next.config.ts). Same
+      // reason `.next` is ignored: it is generated bundles, and linting them
+      // produces hundreds of errors about code nobody wrote.
+      ".next-build/**",
       "out/**",
       "build/**",
       "next-env.d.ts",

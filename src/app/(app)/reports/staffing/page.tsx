@@ -5,6 +5,7 @@ import { currencySymbol } from '@/lib/settings'
 import { formatMoney } from '@/lib/format'
 import {
   pickReportFilters,
+  reportFilterQuery,
   resolvePeople,
   resolveRange,
 } from '@/lib/prospecting/filters'
@@ -24,6 +25,7 @@ import {
   subReachedByStage,
 } from '@/lib/staffing/metrics'
 import { AccessDenied } from '@/components/access-denied'
+import { ExportButtons } from '@/components/export-buttons'
 import { FunnelSteps } from '@/components/funnel-steps'
 import { ReportFilterBar } from '@/components/report-filters'
 import { ButtonLink } from '@/components/ui/button'
@@ -109,6 +111,7 @@ export default async function StaffingReportPage({
     teams,
     symbol,
     canSeeRevenue,
+    canExport,
   ] = await Promise.all([
     requirementTotals(range, people),
     requirementReachedByStage(range, people),
@@ -124,6 +127,7 @@ export default async function StaffingReportPage({
     }),
     currencySymbol(),
     can(viewer, PERMISSIONS.REPORT_REVENUE),
+    can(viewer, PERMISSIONS.DATA_EXPORT),
   ])
 
   const qualifiedId = byCode(requirementStages, REQUIREMENT_STAGE_CODES.qualified)
@@ -214,12 +218,20 @@ export default async function StaffingReportPage({
         // query string would silently drop or mean the wrong thing. Dates are
         // the part that means the same on both screens.
         actions={
-          <ButtonLink
-            href={`/requirements?status=all&from=${range.fromKey}&to=${range.toKey}`}
-            variant="secondary"
-          >
-            Open the requirement list
-          </ButtonLink>
+          <div className="flex gap-2">
+            <ButtonLink
+              href={`/requirements?status=all&from=${range.fromKey}&to=${range.toKey}`}
+              variant="secondary"
+            >
+              Open the requirement list
+            </ButtonLink>
+            {canExport ? (
+              <ExportButtons
+                report="staffing"
+                query={reportFilterQuery(filters)}
+              />
+            ) : null}
+          </div>
         }
       />
 
