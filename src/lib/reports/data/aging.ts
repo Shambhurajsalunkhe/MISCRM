@@ -88,7 +88,7 @@ export async function loadAging(scope: AnalyticsScope): Promise<AgingReport> {
         commonStage: true,
         dealValue: true,
         expectedBudget: true,
-        client: { select: { companyName: true } },
+        client: { select: { clientName: true } },
         vertical: { select: { name: true } },
         currentStage: {
           select: { name: true, agingThresholdDays: true },
@@ -115,7 +115,7 @@ export async function loadAging(scope: AnalyticsScope): Promise<AgingReport> {
       id: lead.id,
       leadCode: lead.leadCode,
       title: lead.title,
-      client: lead.client.companyName,
+      client: lead.client.clientName,
       vertical: lead.vertical.name,
       stage: lead.currentStage?.name ?? null,
       commonStage: lead.commonStage,

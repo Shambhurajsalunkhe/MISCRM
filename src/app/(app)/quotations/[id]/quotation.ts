@@ -38,7 +38,7 @@ export const loadQuotation = cache(async (user: CurrentUser, id: string) => {
           title: true,
           status: true,
           dealValue: true,
-          client: { select: { id: true, companyName: true } },
+          client: { select: { id: true, clientName: true } },
           assignedTo: { select: { name: true } },
           vertical: { select: { name: true, usesInvoicing: true } },
         },

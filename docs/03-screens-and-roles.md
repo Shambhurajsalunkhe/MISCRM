@@ -117,7 +117,7 @@ Every report: filter bar, drill-through, Excel and PDF export.
 
 ## 2. Permission matrix
 
-`✓` full · `◐` own/team scope only · `–` no access
+`✓` full · `◐` own/team scope only · `–` no access · `⊞` team-gated as well
 
 | Capability | BDE | BDM | Manager | Sales Head | Admin |
 |---|:--:|:--:|:--:|:--:|:--:|
@@ -130,8 +130,8 @@ Every report: filter bar, drill-through, Excel and PDF export.
 | Delete (soft) lead | – | – | ◐ | ✓ | ✓ |
 | Log prospecting counters | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Add activities & documents | ◐ | ◐ | ◐ | ✓ | ✓ |
-| Manage staffing requirements | – | ◐ | ◐ | ✓ | ✓ |
-| Manage candidates & submissions | ◐ | ◐ | ◐ | ✓ | ✓ |
+| Manage staffing requirements | –⊞ | ◐⊞ | ◐⊞ | ✓ | ✓ |
+| Manage candidates & submissions | ◐⊞ | ◐⊞ | ◐⊞ | ✓ | ✓ |
 | Contracts / quotations / invoices | – | ◐ | ◐ | ✓ | ✓ |
 | Record payments | – | – | ◐ | ✓ | ✓ |
 | View revenue KPIs | – | ◐ | ◐ | ✓ | ✓ |
@@ -141,6 +141,26 @@ Every report: filter bar, drill-through, Excel and PDF export.
 | Manage users & teams | – | – | – | ✓ | ✓ |
 | Manage master data | – | – | – | – | ✓ |
 | View audit log | – | – | – | ✓ | ✓ |
+
+**The two `⊞` rows are fenced by team as well as by role.** Recruitment is one
+team's work inside the single Sales department, so a tick in this grid is only
+half the answer for staffing — the person must also be on a team flagged *This
+team works on staffing* at `/admin/teams`. Administrators and the Sales Head are
+exempt: one administers the module and the other owns every vertical's numbers.
+
+Everyone else — Managers, BDMs and BDEs outside that team — has no Staffing
+section in the sidebar, cannot reach `/requirements`, `/candidates` or
+`/placements` by URL, gets no Requirements tab on a staffing lead, and sees no
+requirement or candidate hits in global search. The check lives in one place,
+`hasStaffingAccess` in `src/lib/authz.ts`, applied inside `can()` so that every
+screen, server action and report export is closed by the same test rather than by
+sixteen separate ones. Staffing figures stay in the dashboard KPIs and the
+vertical, revenue and won/lost reports for whoever may read those reports — the
+fence is around the module, not around the company's totals.
+
+The flag is off for every team by default, including a team named "Staffing":
+access is granted deliberately, never acquired by creating a team or by naming it
+a particular way.
 
 Two rows worth confirming, since README §32 leaves them open:
 

@@ -110,7 +110,7 @@ export default async function NewLeadPage({
         select: {
           id: true,
           clientCode: true,
-          companyName: true,
+          clientName: true,
           contacts: {
             where: { isActive: true },
             orderBy: [{ isPrimary: 'desc' }, { name: 'asc' }],
@@ -141,7 +141,7 @@ export default async function NewLeadPage({
       select: {
         id: true,
         clientCode: true,
-        companyName: true,
+        clientName: true,
         contacts: {
           where: { isActive: true },
           orderBy: [{ isPrimary: 'desc' }, { name: 'asc' }],
@@ -156,7 +156,7 @@ export default async function NewLeadPage({
   const clientOptions: LeadFormClient[] = capped
     .map((client) => ({
       id: client.id,
-      label: `${client.companyName} · ${client.clientCode}`,
+      label: `${client.clientName} · ${client.clientCode}`,
       contacts: client.contacts.map((contact) => ({
         id: contact.id,
         label: contact.designation

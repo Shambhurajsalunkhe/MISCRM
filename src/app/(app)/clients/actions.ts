@@ -37,7 +37,8 @@ import {
 import type { CurrentUser } from '@/lib/auth/session'
 
 const clientSchema = z.object({
-  companyName: z.string().trim().min(2, 'Enter the company name.').max(200),
+  clientName: z.string().trim().min(2, 'Enter the client name.').max(200),
+  companyName: optionalText(200),
   website: optionalUrl(300),
   companyLinkedIn: optionalUrl(300),
   industry: optionalText(120),
@@ -92,7 +93,7 @@ async function refreshDedupeKey(
   const client = await tx.client.findUnique({
     where: { id: clientId },
     select: {
-      companyName: true,
+      clientName: true,
       website: true,
       contacts: {
         where: { isActive: true, email: { not: null } },
@@ -115,7 +116,7 @@ async function refreshDedupeKey(
 
   await tx.client.update({
     where: { id: clientId },
-    data: { dedupeKey: buildDedupeKey(client.companyName, domain) },
+    data: { dedupeKey: buildDedupeKey(client.clientName, domain) },
   })
 }
 
@@ -123,7 +124,7 @@ async function refreshDedupeKey(
 async function visibleClient(user: CurrentUser, id: string) {
   return prisma.client.findFirst({
     where: { id, isDeleted: false, ...(await clientVisibilityFilter(user)) },
-    select: { id: true, companyName: true },
+    select: { id: true, clientName: true },
   })
 }
 
@@ -142,6 +143,7 @@ export async function createClientAction(
     const overrideReason = optionalString(formData.get('overrideReason'))
 
     const duplicates = await findClientDuplicates({
+      clientName: data.clientName,
       companyName: data.companyName,
       website: data.website,
       companyLinkedIn: data.companyLinkedIn,
@@ -151,10 +153,10 @@ export async function createClientAction(
 
     // First submit stops here and shows what it found; a second submit carrying
     // a reason goes through. Never a hard block — a second genuine enquiry from
-    // a company we already know is the normal case, not the exception.
+    // a client we already know is the normal case, not the exception.
     if (duplicates.length > 0 && !overrideReason) {
       return actionWarning(
-        'This looks like a company we already have. Check the matches, then give a reason to save it anyway.',
+        'This looks like a client we already have. Check the matches, then give a reason to save it anyway.',
         duplicates,
       )
     }
@@ -177,9 +179,9 @@ export async function createClientAction(
           data: {
             ...company,
             clientCode: await nextClientCode(tx),
-            dedupeKey: buildDedupeKey(company.companyName, domain),
+            dedupeKey: buildDedupeKey(company.clientName, domain),
           },
-          select: { id: true, companyName: true, clientCode: true },
+          select: { id: true, clientName: true, clientCode: true },
         })
 
         if (contactName) {
@@ -211,12 +213,12 @@ export async function createClientAction(
 
       createdId = client.id
       revalidatePath('/clients')
-      return actionSuccess(`${client.companyName} added as ${client.clientCode}.`)
+      return actionSuccess(`${client.clientName} added as ${client.clientCode}.`)
     } catch (error) {
       if (isUniqueViolation(error)) {
         return actionError(
-          'A client with this company name and email domain already exists. Open it and add the new enquiry there as a lead.',
-          { companyName: 'This company is already on file.' },
+          'A client with this name and email domain already exists. Open it and add the new enquiry there as a lead.',
+          { clientName: 'This client is already on file.' },
         )
       }
       throw error
@@ -248,6 +250,7 @@ export async function updateClientAction(
     if (!existing) return actionError('That client no longer exists.')
 
     const duplicates = await findClientDuplicates({
+      clientName: data.clientName,
       companyName: data.companyName,
       website: data.website,
       companyLinkedIn: data.companyLinkedIn,
@@ -272,8 +275,8 @@ export async function updateClientAction(
     } catch (error) {
       if (isUniqueViolation(error)) {
         return actionError(
-          'Another client already has this company name and email domain.',
-          { companyName: 'This company is already on file.' },
+          'Another client already has this name and email domain.',
+          { clientName: 'This client is already on file.' },
         )
       }
       throw error
@@ -454,7 +457,7 @@ export async function deleteClientAction(
 
     if (openLeads > 0) {
       return actionError(
-        `${client.companyName} has ${openLeads} open lead(s). Close or delete those first — deleting the client would hide leads people are still working.`,
+        `${client.clientName} has ${openLeads} open lead(s). Close or delete those first — deleting the client would hide leads people are still working.`,
       )
     }
 
@@ -464,6 +467,6 @@ export async function deleteClientAction(
     })
 
     revalidatePath('/clients')
-    return actionSuccess(`${client.companyName} deleted. An administrator can restore it.`)
+    return actionSuccess(`${client.clientName} deleted. An administrator can restore it.`)
   })
 }

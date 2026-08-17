@@ -3,7 +3,10 @@ import { requireUser } from '@/lib/auth/session'
 import { PERMISSIONS } from '@/lib/permissions'
 import { currencySymbol } from '@/lib/settings'
 import { toDateInputValue } from '@/lib/format'
-import { AccessDenied } from '@/components/access-denied'
+import {
+  AccessDenied,
+  STAFFING_ACCESS_REASON,
+} from '@/components/access-denied'
 import { PageHeader } from '@/components/ui/page'
 import { activeUserOptions, requirementTypeOptions } from '../../options'
 import { RequirementForm } from '../../requirement-form'
@@ -25,7 +28,12 @@ export default async function EditRequirementPage({
   // the weaker of the two. Editing the requirement itself needs the stronger
   // one, so it is checked again here rather than assumed from having got in.
   if (!(await can(viewer, PERMISSIONS.STAFFING_REQUIREMENT_MANAGE))) {
-    return <AccessDenied what="editing staffing requirements" />
+    return (
+      <AccessDenied
+        what="editing staffing requirements"
+        reason={STAFFING_ACCESS_REASON}
+      />
+    )
   }
 
   const requirement = await loadRequirement(viewer, id)

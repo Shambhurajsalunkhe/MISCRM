@@ -11,7 +11,10 @@ import {
   INTERVIEW_RESULT_LABELS,
   INTERVIEW_RESULT_TONES,
 } from '@/lib/staffing/display'
-import { AccessDenied } from '@/components/access-denied'
+import {
+  AccessDenied,
+  STAFFING_ACCESS_REASON,
+} from '@/components/access-denied'
 import { Badge } from '@/components/ui/badge'
 import { ButtonLink } from '@/components/ui/button'
 import { Card, EmptyState, PageHeader } from '@/components/ui/page'
@@ -47,7 +50,12 @@ export const metadata = { title: 'Submission · Sales CRM' }
 export default async function SubmissionPage({ params }: { params: Params }) {
   const viewer = await requireUser()
   if (!(await can(viewer, PERMISSIONS.STAFFING_CANDIDATE_MANAGE))) {
-    return <AccessDenied what="candidate submissions" />
+    return (
+      <AccessDenied
+        what="candidate submissions"
+        reason={STAFFING_ACCESS_REASON}
+      />
+    )
   }
 
   const { id, submissionId } = await params
@@ -98,7 +106,7 @@ export default async function SubmissionPage({ params }: { params: Params }) {
           position: true,
           openings: true,
           positionsFilled: true,
-          client: { select: { companyName: true } },
+          client: { select: { clientName: true } },
         },
       },
       placement: {
@@ -179,7 +187,7 @@ export default async function SubmissionPage({ params }: { params: Params }) {
     <div className="space-y-5">
       <PageHeader
         title={candidate.fullName}
-        description={`${candidate.candidateCode} on ${requirement.requirementCode} — ${requirement.position} for ${requirement.client.companyName}.`}
+        description={`${candidate.candidateCode} on ${requirement.requirementCode} — ${requirement.position} for ${requirement.client.clientName}.`}
         actions={
           <>
             <ButtonLink

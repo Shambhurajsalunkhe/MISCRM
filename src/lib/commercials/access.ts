@@ -33,7 +33,7 @@ export async function leadForCommercials(user: CurrentUser, leadId: string) {
       clientId: true,
       status: true,
       dealValue: true,
-      client: { select: { id: true, companyName: true } },
+      client: { select: { id: true, clientName: true } },
       vertical: {
         select: {
           id: true,

@@ -168,7 +168,7 @@ export async function requirementWhere(
                 { skills: { contains: filters.q, mode: 'insensitive' as const } },
                 {
                   client: {
-                    companyName: {
+                    clientName: {
                       contains: filters.q,
                       mode: 'insensitive' as const,
                     },

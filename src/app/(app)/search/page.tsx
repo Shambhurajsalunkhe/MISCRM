@@ -58,7 +58,7 @@ type CommercialHit = {
   kind: 'Quotation' | 'Contract' | 'Invoice'
   status: string
   tone: BadgeTone
-  companyName: string
+  clientName: string
   leadId: string
   leadCode: string
 }
@@ -84,7 +84,7 @@ async function findCommercials(
     select: {
       id: true,
       leadCode: true,
-      client: { select: { companyName: true } },
+      client: { select: { clientName: true } },
     },
   }
 
@@ -123,7 +123,7 @@ async function findCommercials(
       kind: 'Quotation' as const,
       status: QUOTATION_STATUS_LABELS[row.status],
       tone: QUOTATION_STATUS_TONES[row.status],
-      companyName: row.lead.client.companyName,
+      clientName: row.lead.client.clientName,
       leadId: row.lead.id,
       leadCode: row.lead.leadCode,
     })),
@@ -133,7 +133,7 @@ async function findCommercials(
       kind: 'Contract' as const,
       status: CONTRACT_STATUS_LABELS[row.status],
       tone: CONTRACT_STATUS_TONES[row.status],
-      companyName: row.lead.client.companyName,
+      clientName: row.lead.client.clientName,
       leadId: row.lead.id,
       leadCode: row.lead.leadCode,
     })),
@@ -145,7 +145,7 @@ async function findCommercials(
         kind: 'Invoice' as const,
         status: INVOICE_STATUS_LABELS[shown],
         tone: INVOICE_STATUS_TONES[shown],
-        companyName: row.lead.client.companyName,
+        clientName: row.lead.client.clientName,
         leadId: row.lead.id,
         leadCode: row.lead.leadCode,
       }
@@ -202,6 +202,7 @@ export default async function SearchPage({
                   OR: [
                     { leadCode: insensitive },
                     { title: insensitive },
+                    { client: { clientName: insensitive } },
                     { client: { companyName: insensitive } },
                     { referenceUrl: insensitive },
                   ],
@@ -214,7 +215,7 @@ export default async function SearchPage({
               title: true,
               status: true,
               createdAt: true,
-              client: { select: { companyName: true } },
+              client: { select: { clientName: true } },
               vertical: { select: { name: true } },
               currentStage: { select: { name: true } },
               assignedTo: { select: { name: true } },
@@ -229,6 +230,7 @@ export default async function SearchPage({
                 await clientVisibilityFilter(viewer),
                 {
                   OR: [
+                    { clientName: insensitive },
                     { companyName: insensitive },
                     { clientCode: insensitive },
                     { website: insensitive },
@@ -240,13 +242,13 @@ export default async function SearchPage({
             select: {
               id: true,
               clientCode: true,
-              companyName: true,
+              clientName: true,
               website: true,
               country: { select: { name: true } },
               owner: { select: { name: true } },
               _count: { select: { leads: { where: { isDeleted: false } } } },
             },
-            orderBy: { companyName: 'asc' },
+            orderBy: { clientName: 'asc' },
             take: LIMIT,
           }),
           prisma.clientContact.findMany({
@@ -269,7 +271,7 @@ export default async function SearchPage({
               email: true,
               phone: true,
               isActive: true,
-              client: { select: { id: true, companyName: true } },
+              client: { select: { id: true, clientName: true } },
             },
             orderBy: { name: 'asc' },
             take: LIMIT,
@@ -289,7 +291,7 @@ export default async function SearchPage({
                         { requirementCode: insensitive },
                         { position: insensitive },
                         { skills: insensitive },
-                        { client: { companyName: insensitive } },
+                        { client: { clientName: insensitive } },
                       ],
                     },
                   ],
@@ -301,7 +303,7 @@ export default async function SearchPage({
                   status: true,
                   openings: true,
                   positionsFilled: true,
-                  client: { select: { companyName: true } },
+                  client: { select: { clientName: true } },
                   currentStage: { select: { name: true } },
                   assignedTo: { select: { name: true } },
                 },
@@ -422,7 +424,7 @@ export default async function SearchPage({
                         </div>
                       </TD>
                       <TD className="text-slate-600">
-                        {lead.client.companyName}
+                        {lead.client.clientName}
                       </TD>
                       <TD className="text-slate-600">{lead.vertical.name}</TD>
                       <TD className="text-slate-600">
@@ -468,7 +470,7 @@ export default async function SearchPage({
                           href={`/clients/${client.id}`}
                           className="font-medium text-slate-900 hover:underline"
                         >
-                          {client.companyName}
+                          {client.clientName}
                         </a>
                         <div className="text-xs text-slate-500">
                           {client.clientCode}
@@ -525,7 +527,7 @@ export default async function SearchPage({
                           href={`/clients/${contact.client.id}`}
                           className="text-slate-700 hover:underline"
                         >
-                          {contact.client.companyName}
+                          {contact.client.clientName}
                         </a>
                       </TD>
                       <TD className="text-slate-600">{contact.email ?? '—'}</TD>
@@ -567,7 +569,7 @@ export default async function SearchPage({
                         </div>
                       </TD>
                       <TD className="text-slate-600">
-                        {requirement.client.companyName}
+                        {requirement.client.clientName}
                       </TD>
                       <TD className="text-slate-600">
                         {requirement.currentStage?.name ?? '—'}
@@ -621,7 +623,7 @@ export default async function SearchPage({
                         </a>
                       </TD>
                       <TD className="text-slate-600">{row.kind}</TD>
-                      <TD className="text-slate-600">{row.companyName}</TD>
+                      <TD className="text-slate-600">{row.clientName}</TD>
                       <TD>
                         <a
                           href={`/leads/${row.leadId}`}

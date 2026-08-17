@@ -63,7 +63,7 @@ export default async function ContractPage({ params }: { params: Params }) {
           id: true,
           leadCode: true,
           title: true,
-          client: { select: { id: true, companyName: true } },
+          client: { select: { id: true, clientName: true } },
           assignedTo: { select: { name: true } },
           vertical: { select: { name: true, usesInvoicing: true } },
         },
@@ -136,7 +136,7 @@ export default async function ContractPage({ params }: { params: Params }) {
                 href={`/clients/${contract.lead.client.id}`}
                 className="hover:underline"
               >
-                {contract.lead.client.companyName}
+                {contract.lead.client.clientName}
               </a>
               {' · '}
               <a href={`/leads/${contract.lead.id}`} className="hover:underline">

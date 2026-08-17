@@ -63,7 +63,7 @@ export default async function LeadOverviewPage({ params }: { params: Params }) {
               href={`/clients/${lead.client.id}`}
               className="text-slate-800 underline hover:text-slate-900"
             >
-              {lead.client.companyName}
+              {lead.client.clientName}
             </a>
             <span className="text-slate-500"> · {lead.client.clientCode}</span>
           </Fact>

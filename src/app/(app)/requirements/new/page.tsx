@@ -3,7 +3,10 @@ import { pageAccess } from '@/lib/authz'
 import { PERMISSIONS } from '@/lib/permissions'
 import { currencySymbol } from '@/lib/settings'
 import { leadVisibilityFilter } from '@/lib/visibility'
-import { AccessDenied } from '@/components/access-denied'
+import {
+  AccessDenied,
+  STAFFING_ACCESS_REASON,
+} from '@/components/access-denied'
 import { EmptyState, PageHeader } from '@/components/ui/page'
 import {
   activeUserOptions,
@@ -30,7 +33,13 @@ export default async function NewRequirementPage({
   searchParams: SearchParams
 }) {
   const viewer = await pageAccess(PERMISSIONS.STAFFING_REQUIREMENT_MANAGE)
-  if (!viewer) return <AccessDenied what="staffing requirements" />
+  if (!viewer)
+    return (
+      <AccessDenied
+        what="staffing requirements"
+        reason={STAFFING_ACCESS_REASON}
+      />
+    )
 
   const { lead: leadId } = await searchParams
 
@@ -48,7 +57,7 @@ export default async function NewRequirementPage({
           id: true,
           leadCode: true,
           title: true,
-          client: { select: { companyName: true } },
+          client: { select: { clientName: true } },
         },
       })
     : null
@@ -64,7 +73,7 @@ export default async function NewRequirementPage({
     id: lead.id,
     leadCode: lead.leadCode,
     title: lead.title,
-    companyName: lead.client.companyName,
+    clientName: lead.client.clientName,
   }))
 
   return (
@@ -90,7 +99,7 @@ export default async function NewRequirementPage({
                   id: lockedLead.id,
                   leadCode: lockedLead.leadCode,
                   title: lockedLead.title,
-                  companyName: lockedLead.client.companyName,
+                  clientName: lockedLead.client.clientName,
                 }
               : undefined
           }

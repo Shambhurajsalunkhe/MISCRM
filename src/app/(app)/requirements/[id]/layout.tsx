@@ -10,7 +10,10 @@ import {
   REQUIREMENT_STATUS_LABELS,
   REQUIREMENT_STATUS_TONES,
 } from '@/lib/staffing/display'
-import { AccessDenied } from '@/components/access-denied'
+import {
+  AccessDenied,
+  STAFFING_ACCESS_REASON,
+} from '@/components/access-denied'
 import { Badge } from '@/components/ui/badge'
 import { ButtonLink } from '@/components/ui/button'
 import { LinkTabs } from '@/components/ui/tabs'
@@ -54,7 +57,12 @@ export default async function RequirementLayout({
 }) {
   const viewer = await requireUser()
   if (!(await can(viewer, PERMISSIONS.STAFFING_CANDIDATE_MANAGE))) {
-    return <AccessDenied what="staffing requirements" />
+    return (
+      <AccessDenied
+        what="staffing requirements"
+        reason={STAFFING_ACCESS_REASON}
+      />
+    )
   }
 
   const { id } = await params
@@ -119,7 +127,7 @@ export default async function RequirementLayout({
                 href={`/clients/${requirement.client.id}`}
                 className="hover:underline"
               >
-                {requirement.client.companyName}
+                {requirement.client.clientName}
               </a>
               {' · '}
               <a href={`/leads/${requirement.lead.id}`} className="hover:underline">

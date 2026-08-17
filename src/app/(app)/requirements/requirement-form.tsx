@@ -15,7 +15,7 @@ export type RequirementLeadOption = {
   id: string
   leadCode: string
   title: string
-  companyName: string
+  clientName: string
 }
 
 export type RequirementFormValues = {
@@ -111,7 +111,7 @@ export function RequirementForm({
                 <option value="">Choose a lead</option>
                 {(leads ?? []).map((lead) => (
                   <option key={lead.id} value={lead.id}>
-                    {lead.leadCode} — {lead.companyName} — {lead.title}
+                    {lead.leadCode} — {lead.clientName} — {lead.title}
                   </option>
                 ))}
               </Select>
@@ -127,7 +127,7 @@ export function RequirementForm({
               >
                 {lockedLead.leadCode}
               </a>{' '}
-              for {lockedLead.companyName}.
+              for {lockedLead.clientName}.
             </p>
           ) : null}
 

@@ -21,7 +21,8 @@ import { createClientAction, updateClientAction } from './actions'
 
 export type ClientFormValues = {
   id: string
-  companyName: string
+  clientName: string
+  companyName: string | null
   website: string | null
   companyLinkedIn: string | null
   industry: string | null
@@ -79,21 +80,34 @@ export function ClientForm({
         </Field>
       ) : null}
 
-      <Card title="Company">
+      <Card title="Client">
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Client name"
+            htmlFor="clientName"
+            hint="A person or a firm — whatever this client is called."
+            error={errors.clientName}
+            required
+          >
+            <Input
+              id="clientName"
+              name="clientName"
+              defaultValue={client?.clientName ?? ''}
+              aria-invalid={Boolean(errors.clientName)}
+              required
+            />
+          </Field>
+
           <Field
             label="Company name"
             htmlFor="companyName"
+            hint="If the client is a registered company."
             error={errors.companyName}
-            required
-            className="sm:col-span-2"
           >
             <Input
               id="companyName"
               name="companyName"
               defaultValue={client?.companyName ?? ''}
-              aria-invalid={Boolean(errors.companyName)}
-              required
             />
           </Field>
 

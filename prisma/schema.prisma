@@ -247,6 +247,11 @@ model Team {
   departmentId String?
   managerId    String?
   isActive     Boolean @default(true)
+  /// Members of this team may reach the staffing module. Off by default: the
+  /// staffing pipeline is one team's work, not the whole sales floor's, and a
+  /// new team should never acquire it by being created. Admin and Sales Head
+  /// bypass this — see src/lib/authz.ts.
+  staffingAccess Boolean @default(false)
 
   department Department? @relation(fields: [departmentId], references: [id])
   manager    User?       @relation("TeamManager", fields: [managerId], references: [id])
@@ -591,9 +596,21 @@ model LeadSequence {
 model Client {
   id                String  @id @default(cuid())
   clientCode        String  @unique
-  companyName       String
-  /// lower(companyName) + primary email domain — used by the de-duplication step
+  /// What the account is called — the first thing typed on every vertical's lead
+  /// form. Often a person rather than a firm: an Upwork or LinkedIn client is a
+  /// name and an inbox long before anyone learns which company is behind it.
+  clientName        String
+  /// The registered company, when there is one to record. Optional on purpose —
+  /// only Staffing and Product Sales routinely know it, and requiring it
+  /// everywhere else made people type the client's name twice to get past the
+  /// field.
+  companyName       String?
+  /// lower(clientName) + primary email domain — used by the de-duplication step
   /// shown in the flowchart's Lead Intake band.
+  ///
+  /// Keyed on `clientName` rather than `companyName` because the latter is now
+  /// nullable, and a unique key that half the rows leave blank collapses them
+  /// onto one value and makes the second one unsavable.
   dedupeKey         String  @unique
   website           String?
   companyLinkedIn   String?
@@ -618,7 +635,7 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([companyName])
+  @@index([clientName])
   @@index([countryId])
 }
 

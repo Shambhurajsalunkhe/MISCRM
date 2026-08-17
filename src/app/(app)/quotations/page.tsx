@@ -63,7 +63,7 @@ export default async function QuotationsPage({
             {
               lead: {
                 client: {
-                  companyName: {
+                  clientName: {
                     contains: search,
                     mode: 'insensitive' as const,
                   },
@@ -89,7 +89,7 @@ export default async function QuotationsPage({
           select: {
             id: true,
             leadCode: true,
-            client: { select: { id: true, companyName: true } },
+            client: { select: { id: true, clientName: true } },
             assignedTo: { select: { name: true } },
           },
         },
@@ -221,7 +221,7 @@ export default async function QuotationsPage({
                       href={`/clients/${quotation.lead.client.id}`}
                       className="text-slate-700 hover:underline"
                     >
-                      {quotation.lead.client.companyName}
+                      {quotation.lead.client.clientName}
                     </a>
                   </TD>
                   <TD className="text-slate-600">

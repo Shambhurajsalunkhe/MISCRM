@@ -11,7 +11,10 @@ import {
   REQUIREMENT_STATUS_ORDER,
   REQUIREMENT_STATUS_TONES,
 } from '@/lib/staffing/display'
-import { AccessDenied } from '@/components/access-denied'
+import {
+  AccessDenied,
+  STAFFING_ACCESS_REASON,
+} from '@/components/access-denied'
 import { Badge } from '@/components/ui/badge'
 import { ButtonLink } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/field'
@@ -41,7 +44,13 @@ export default async function RequirementsPage({
   searchParams: SearchParams
 }) {
   const viewer = await pageAccess(PERMISSIONS.STAFFING_REQUIREMENT_MANAGE)
-  if (!viewer) return <AccessDenied what="staffing requirements" />
+  if (!viewer)
+    return (
+      <AccessDenied
+        what="staffing requirements"
+        reason={STAFFING_ACCESS_REASON}
+      />
+    )
 
   const filters = pickRequirementFilters(await searchParams)
   const query = requirementFilterQuery(filters)
@@ -66,7 +75,7 @@ export default async function RequirementsPage({
           stageChangedAt: true,
           budgetMin: true,
           budgetMax: true,
-          client: { select: { id: true, companyName: true } },
+          client: { select: { id: true, clientName: true } },
           lead: { select: { id: true, leadCode: true } },
           currentStage: { select: { name: true, agingThresholdDays: true } },
           assignedTo: { select: { name: true } },
@@ -92,8 +101,8 @@ export default async function RequirementsPage({
           isDeleted: false,
           requirements: { some: { isDeleted: false, ...visibleRequirements } },
         },
-        select: { id: true, companyName: true },
-        orderBy: { companyName: 'asc' },
+        select: { id: true, clientName: true },
+        orderBy: { clientName: 'asc' },
       }),
       currencySymbol(),
     ])
@@ -151,7 +160,7 @@ export default async function RequirementsPage({
           blank="All clients"
           options={clients.map((client) => ({
             value: client.id,
-            label: client.companyName,
+            label: client.clientName,
           }))}
         />
 
@@ -280,7 +289,7 @@ export default async function RequirementsPage({
                         href={`/clients/${requirement.client.id}`}
                         className="text-slate-700 hover:underline"
                       >
-                        {requirement.client.companyName}
+                        {requirement.client.clientName}
                       </a>
                       <div className="text-xs text-slate-500">
                         <a

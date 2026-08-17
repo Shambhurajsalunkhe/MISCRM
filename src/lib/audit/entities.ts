@@ -107,7 +107,7 @@ export const AUDITED_MODELS: Record<string, AuditedModel> = {
   },
 
   // --- Sales records (screens land in Phases 2-5; the writer is ready now) --
-  Client: { entityType: 'CLIENT', idField: 'id', ignore: TIMESTAMPS, labelField: 'companyName' },
+  Client: { entityType: 'CLIENT', idField: 'id', ignore: TIMESTAMPS, labelField: 'clientName' },
   ClientContact: { entityType: 'CONTACT', idField: 'id', ignore: TIMESTAMPS, labelField: 'name' },
   Lead: { entityType: 'LEAD', idField: 'id', ignore: TIMESTAMPS, labelField: 'leadCode' },
   Requirement: { entityType: 'REQUIREMENT', idField: 'id', ignore: TIMESTAMPS, labelField: 'requirementCode' },

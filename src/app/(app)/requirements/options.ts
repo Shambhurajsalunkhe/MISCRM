@@ -81,7 +81,7 @@ export async function requirementLeadOptions(user: CurrentUser) {
       leadCode: true,
       title: true,
       assignedToId: true,
-      client: { select: { companyName: true } },
+      client: { select: { clientName: true } },
     },
     orderBy: { createdAt: 'desc' },
     take: LEAD_PICKER_LIMIT,

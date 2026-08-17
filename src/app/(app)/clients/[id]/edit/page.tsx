@@ -24,6 +24,7 @@ export default async function EditClientPage({ params }: { params: Params }) {
       where: { id, isDeleted: false, ...(await clientVisibilityFilter(viewer)) },
       select: {
         id: true,
+        clientName: true,
         companyName: true,
         website: true,
         companyLinkedIn: true,
@@ -43,8 +44,8 @@ export default async function EditClientPage({ params }: { params: Params }) {
   return (
     <div className="max-w-3xl space-y-5">
       <PageHeader
-        title={`Edit ${client.companyName}`}
-        description="Contacts are managed on the client page. Renaming a company re-checks it for duplicates."
+        title={`Edit ${client.clientName}`}
+        description="Contacts are managed on the client page. Renaming a client re-checks it for duplicates."
       />
       <ClientForm
         client={client}

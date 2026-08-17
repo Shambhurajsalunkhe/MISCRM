@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db'
 import { requireUser, type CurrentUser } from '@/lib/auth/session'
 import {
   DEFAULT_ROLE_PERMISSIONS,
+  PERMISSIONS,
   type Permission,
 } from '@/lib/permissions'
 import { AuthorizationError } from '@/lib/errors'
@@ -31,12 +32,69 @@ const permissionsForRole = cache(async (role: UserRole) => {
   )
 })
 
+/**
+ * Staffing is the one module gated by *team* as well as by role.
+ *
+ * The permission matrix answers "may a BDE manage candidates at all", which is
+ * a company-wide statement about the role — and the answer stayed yes even for
+ * the BDEs who have never touched a requirement. Recruitment sits with one team
+ * inside Sales, so the second question is which team the person is on, and
+ * that is a data fact rather than another row in the matrix.
+ *
+ * Both are required: the permission says what the role may do, the flag says
+ * whose work it is. Turning the flag on for a team does not hand its BDEs
+ * capabilities their role never had.
+ */
+const STAFFING_PERMISSIONS = new Set<string>([
+  PERMISSIONS.STAFFING_REQUIREMENT_MANAGE,
+  PERMISSIONS.STAFFING_CANDIDATE_MANAGE,
+])
+
+/**
+ * Roles that reach staffing without belonging to a staffing team. Admin
+ * administers it and Sales Head owns the whole pipeline, so locking either out
+ * of a vertical they are accountable for would only produce a support call.
+ */
+const STAFFING_EXEMPT_ROLES: UserRole[] = ['ADMIN', 'SALES_HEAD']
+
+const teamStaffingAccess = cache(async (teamId: string) => {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { staffingAccess: true },
+  })
+  return team?.staffingAccess ?? false
+})
+
+/**
+ * Whether this user is inside the staffing module's fence at all — before any
+ * question of which records they may see, which stays with `visibility.ts`.
+ *
+ * Deliberately does not consider `Team.isActive`: deactivating a team hides it
+ * from the pickers and leaves its members where they are, and taking their
+ * screens away as a side effect of tidying the org chart would be a surprise.
+ */
+export async function hasStaffingAccess(user: CurrentUser): Promise<boolean> {
+  if (STAFFING_EXEMPT_ROLES.includes(user.role)) return true
+  if (!user.teamId) return false
+  return teamStaffingAccess(user.teamId)
+}
+
 export async function can(
   user: CurrentUser,
   permission: Permission,
 ): Promise<boolean> {
   const granted = await permissionsForRole(user.role)
-  return granted.has(permission)
+  if (!granted.has(permission)) return false
+
+  // Applied here rather than at each screen so the sidebar, all sixteen
+  // staffing pages, their server actions, the lead's Requirements tab, global
+  // search and the report exports are all closed by the same check — none of
+  // them can be the one that forgot.
+  if (STAFFING_PERMISSIONS.has(permission)) {
+    return hasStaffingAccess(user)
+  }
+
+  return true
 }
 
 /**

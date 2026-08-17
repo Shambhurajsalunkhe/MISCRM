@@ -134,6 +134,42 @@ export function LeadForm({
         title="Client"
         description="A returning customer gets a new lead against the account we already have, never a second company record."
       >
+        {/*
+         * Both routes in are shown up front. The new-company branch used to be
+         * reachable only through a grey text link under the picker, which read as
+         * a caption rather than a control — people concluded the lead form could
+         * not create a client at all and went to /clients first. Two visible
+         * options cost one row and remove the guess.
+         */}
+        <div
+          role="radiogroup"
+          aria-label="Client"
+          className="mb-4 inline-flex rounded-md border border-slate-300 p-0.5"
+        >
+          {[
+            { value: false, label: 'Existing client' },
+            { value: true, label: 'New client' },
+          ].map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              role="radio"
+              aria-checked={newCompany === option.value}
+              onClick={() => {
+                setNewCompany(option.value)
+                if (option.value) setClientId('')
+              }}
+              className={
+                newCompany === option.value
+                  ? 'rounded px-3 py-1.5 text-sm font-medium bg-slate-900 text-white'
+                  : 'rounded px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900'
+              }
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
         {newCompany ? (
           <div className="space-y-4">
             {needsOverride ? (
@@ -154,17 +190,32 @@ export function LeadForm({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="Company name"
-                htmlFor="companyName"
-                error={errors.companyName}
+                label="Client name"
+                htmlFor="clientName"
+                hint="A person or a firm — whatever this client is called."
+                error={errors.clientName}
                 required
               >
                 <Input
-                  id="companyName"
-                  name="companyName"
-                  aria-invalid={Boolean(errors.companyName)}
+                  id="clientName"
+                  name="clientName"
+                  aria-invalid={Boolean(errors.clientName)}
                   required
                 />
+              </Field>
+
+              {/*
+               * Second, and optional on every vertical. Staffing and Product
+               * Sales usually know the firm; an Upwork or LinkedIn client is a
+               * name and an inbox for weeks before anyone learns it.
+               */}
+              <Field
+                label="Company name"
+                htmlFor="companyName"
+                hint="If the client is a registered company."
+                error={errors.companyName}
+              >
+                <Input id="companyName" name="companyName" />
               </Field>
 
               <Field label="Website" htmlFor="website" error={errors.website}>
@@ -206,14 +257,6 @@ export function LeadForm({
                 <Input id="contactPhone" name="contactPhone" />
               </Field>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setNewCompany(false)}
-              className="text-sm text-slate-600 underline hover:text-slate-900"
-            >
-              Pick an existing client instead
-            </button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -276,17 +319,6 @@ export function LeadForm({
                 </Select>
               </Field>
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setNewCompany(true)
-                setClientId('')
-              }}
-              className="text-sm text-slate-600 underline hover:text-slate-900"
-            >
-              This company is not on file yet
-            </button>
           </div>
         )}
       </Card>

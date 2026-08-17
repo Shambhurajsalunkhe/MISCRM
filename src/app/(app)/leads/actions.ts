@@ -67,9 +67,10 @@ const leadSchema = z.object({
   sourceActivityId: optionalId,
 })
 
-/** Creating a lead against a company that is not on file yet. */
+/** Creating a lead against a client that is not on file yet. */
 const newClientSchema = z.object({
-  companyName: z.string().trim().min(2, 'Enter the company name.').max(200),
+  clientName: z.string().trim().min(2, 'Enter the client name.').max(200),
+  companyName: optionalText(200),
   website: optionalUrl(300),
   countryId: optionalId,
   contactName: optionalText(120),
@@ -142,6 +143,7 @@ async function resolveClient(
   const overrideReason = optionalString(formData.get('overrideReason'))
 
   const duplicates = await findClientDuplicates({
+    clientName: data.clientName,
     companyName: data.companyName,
     website: data.website,
     contactEmail: data.contactEmail,
@@ -164,12 +166,13 @@ async function resolveClient(
     const created = await auditedTransaction(async (tx) => {
       const client = await tx.client.create({
         data: {
+          clientName: data.clientName,
           companyName: data.companyName,
           website: data.website,
           countryId: data.countryId,
           ownerId: actor.id,
           clientCode: await nextClientCode(tx),
-          dedupeKey: buildDedupeKey(data.companyName, domain),
+          dedupeKey: buildDedupeKey(data.clientName, domain),
         },
         select: { id: true },
       })
@@ -209,8 +212,8 @@ async function resolveClient(
       return {
         ok: false,
         state: actionError(
-          'A client with this company name and email domain already exists. Search for it in the client picker instead.',
-          { companyName: 'This company is already on file.' },
+          'A client with this name and email domain already exists. Search for it in the client picker instead.',
+          { clientName: 'This client is already on file.' },
         ),
       }
     }

@@ -23,7 +23,7 @@ export type CommercialLeadOption = {
   id: string
   leadCode: string
   title: string
-  companyName: string
+  clientName: string
 }
 
 export async function commercialLeadOptions(
@@ -40,7 +40,7 @@ export async function commercialLeadOptions(
       id: true,
       leadCode: true,
       title: true,
-      client: { select: { companyName: true } },
+      client: { select: { clientName: true } },
     },
     orderBy: { createdAt: 'desc' },
     take: LEAD_PICKER_LIMIT,
@@ -50,7 +50,7 @@ export async function commercialLeadOptions(
     id: lead.id,
     leadCode: lead.leadCode,
     title: lead.title,
-    companyName: lead.client.companyName,
+    clientName: lead.client.clientName,
   }))
 }
 
@@ -80,7 +80,7 @@ export async function lockedLeadOption(
       id: true,
       leadCode: true,
       title: true,
-      client: { select: { companyName: true } },
+      client: { select: { clientName: true } },
     },
   })
 
@@ -89,7 +89,7 @@ export async function lockedLeadOption(
         id: lead.id,
         leadCode: lead.leadCode,
         title: lead.title,
-        companyName: lead.client.companyName,
+        clientName: lead.client.clientName,
       }
     : null
 }

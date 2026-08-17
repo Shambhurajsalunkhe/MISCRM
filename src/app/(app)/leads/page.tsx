@@ -66,7 +66,7 @@ export default async function LeadsPage({
         stageChangedAt: true,
         nextFollowUpAt: true,
         createdAt: true,
-        client: { select: { id: true, companyName: true } },
+        client: { select: { id: true, clientName: true } },
         vertical: { select: { name: true } },
         currentStage: { select: { name: true } },
         generatedBy: { select: { name: true } },
@@ -337,7 +337,7 @@ export default async function LeadsPage({
                         href={`/clients/${lead.client.id}`}
                         className="text-slate-700 hover:underline"
                       >
-                        {lead.client.companyName}
+                        {lead.client.clientName}
                       </a>
                     </TD>
                     <TD className="text-slate-600">{lead.vertical.name}</TD>

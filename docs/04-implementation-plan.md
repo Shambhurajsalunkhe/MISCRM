@@ -503,6 +503,31 @@ Notification centre and rules, email delivery, follow-up and aging jobs.
 CSV/Excel import for clients, leads and candidates. Performance pass on the
 dashboard queries. Backup and restore procedure. Deployment.
 
+**Staffing is fenced to the staffing team** — the first thing built in this
+phase. The permission matrix had handed staffing to all five roles, which was
+right when it described what a role *may* do and wrong as a description of who
+does recruitment: one team inside the single Sales department. So `Team` gained a
+`staffingAccess` flag, toggled at `/admin/teams`, and `can()` now requires it on
+top of the matrix tick for the two staffing capabilities. Admin and Sales Head
+bypass it.
+
+Three things follow from putting the test inside `can()` rather than on the
+screens. The sidebar, all sixteen staffing pages, their server actions, the lead
+Requirements tab, global search and the report exports close together — none of
+them can be the one that forgot. Turning the flag on for a team grants its
+members nothing their role did not already have, because both tests must pass.
+And the flag defaults to false, so the migration closes staffing for everyone and
+an administrator opens it for the one team that works it — defaulting to true
+would have preserved the state the change exists to end. It is deliberately
+independent of `Team.isActive`: deactivating a team already leaves its members
+where they are, and revoking their screens as a side effect of tidying the org
+chart would be a surprise.
+
+Staffing numbers stay in the dashboard and the vertical, revenue and won/lost
+reports for anyone who may read those reports. The fence is around the module,
+not around the company's totals — a Manager reading Won Revenue still sees what
+staffing contributed to it without being able to open a candidate.
+
 ### Phase 8 — Optional, on your word
 Automation rules engine, targets and quotas (open question Q6), external
 integrations (Q4), mobile-responsive refinements.

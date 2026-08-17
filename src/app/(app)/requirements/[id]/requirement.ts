@@ -50,7 +50,7 @@ export const loadRequirement = cache(
         requirementTypeId: true,
         assignedToId: true,
         client: {
-          select: { id: true, clientCode: true, companyName: true },
+          select: { id: true, clientCode: true, clientName: true },
         },
         lead: {
           select: {

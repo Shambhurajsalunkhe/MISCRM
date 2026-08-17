@@ -77,7 +77,7 @@ export default async function InvoicesPage({
             },
             {
               client: {
-                companyName: { contains: search, mode: 'insensitive' as const },
+                clientName: { contains: search, mode: 'insensitive' as const },
               },
             },
           ],
@@ -97,7 +97,7 @@ export default async function InvoicesPage({
         amountReceived: true,
         amountPending: true,
         status: true,
-        client: { select: { id: true, companyName: true } },
+        client: { select: { id: true, clientName: true } },
         lead: {
           select: {
             id: true,
@@ -257,7 +257,7 @@ export default async function InvoicesPage({
                         href={`/clients/${invoice.client.id}`}
                         className="text-slate-700 hover:underline"
                       >
-                        {invoice.client.companyName}
+                        {invoice.client.clientName}
                       </a>
                     </TD>
                     <TD className="text-slate-600">

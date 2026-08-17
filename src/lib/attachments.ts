@@ -103,14 +103,14 @@ export async function resolveTarget(
         isDeleted: false,
         ...(await clientVisibilityFilter(user)),
       },
-      select: { id: true, companyName: true },
+      select: { id: true, clientName: true },
     })
 
     if (!client) return null
 
     return {
       target,
-      label: client.companyName,
+      label: client.clientName,
       path: `/clients/${client.id}`,
       link: { clientId: client.id },
     }

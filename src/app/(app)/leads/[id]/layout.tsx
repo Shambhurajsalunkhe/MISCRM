@@ -115,7 +115,7 @@ export default async function LeadLayout({
                 href={`/clients/${lead.client.id}`}
                 className="hover:underline"
               >
-                {lead.client.companyName}
+                {lead.client.clientName}
               </a>
               {lead.primaryContact ? ` · ${lead.primaryContact.name}` : ''}
             </p>

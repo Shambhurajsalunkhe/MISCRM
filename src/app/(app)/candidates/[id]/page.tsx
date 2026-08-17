@@ -6,7 +6,10 @@ import { PERMISSIONS } from '@/lib/permissions'
 import { currencySymbol } from '@/lib/settings'
 import { requirementVisibilityFilter } from '@/lib/visibility'
 import { formatAge, formatDate, formatMoney } from '@/lib/format'
-import { AccessDenied } from '@/components/access-denied'
+import {
+  AccessDenied,
+  STAFFING_ACCESS_REASON,
+} from '@/components/access-denied'
 import { ActiveBadge, Badge } from '@/components/ui/badge'
 import { ButtonLink } from '@/components/ui/button'
 import { ExternalLink } from '@/components/ui/external-link'
@@ -51,7 +54,13 @@ export default async function CandidateDetailPage({
   params: Params
 }) {
   const viewer = await pageAccess(PERMISSIONS.STAFFING_CANDIDATE_MANAGE)
-  if (!viewer) return <AccessDenied what="the candidate master" />
+  if (!viewer)
+    return (
+      <AccessDenied
+        what="the candidate master"
+        reason={STAFFING_ACCESS_REASON}
+      />
+    )
 
   const { id } = await params
 
@@ -133,7 +142,7 @@ export default async function CandidateDetailPage({
             id: true,
             requirementCode: true,
             position: true,
-            client: { select: { id: true, companyName: true } },
+            client: { select: { id: true, clientName: true } },
           },
         },
         placement: { select: { placementValue: true } },
@@ -333,7 +342,7 @@ export default async function CandidateDetailPage({
                         href={`/clients/${submission.requirement.client.id}`}
                         className="text-slate-700 hover:underline"
                       >
-                        {submission.requirement.client.companyName}
+                        {submission.requirement.client.clientName}
                       </a>
                     </TD>
                     <TD>

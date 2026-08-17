@@ -52,7 +52,7 @@ export default async function ClientsPage({
         ? [
             {
               OR: [
-                { companyName: { contains: search, mode: 'insensitive' as const } },
+                { clientName: { contains: search, mode: 'insensitive' as const } },
                 { clientCode: { contains: search, mode: 'insensitive' as const } },
                 { website: { contains: search, mode: 'insensitive' as const } },
                 {
@@ -86,7 +86,7 @@ export default async function ClientsPage({
       select: {
         id: true,
         clientCode: true,
-        companyName: true,
+        clientName: true,
         industry: true,
         city: true,
         isActive: true,
@@ -101,7 +101,7 @@ export default async function ClientsPage({
         },
         _count: { select: { leads: { where: { isDeleted: false } } } },
       },
-      orderBy: { companyName: 'asc' },
+      orderBy: { clientName: 'asc' },
       take: PAGE_SIZE,
     }),
     prisma.client.count({ where }),
@@ -221,7 +221,7 @@ export default async function ClientsPage({
                       href={`/clients/${client.id}`}
                       className="font-medium text-slate-900 hover:underline"
                     >
-                      {client.companyName}
+                      {client.clientName}
                     </a>
                     <div className="text-xs text-slate-500">
                       {client.clientCode}

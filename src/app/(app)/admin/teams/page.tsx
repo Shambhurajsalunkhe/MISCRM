@@ -54,6 +54,7 @@ export default async function TeamsPage({
         isActive: true,
         departmentId: true,
         managerId: true,
+        staffingAccess: true,
         department: { select: { name: true } },
         manager: { select: { name: true } },
         _count: { select: { members: true } },
@@ -211,7 +212,7 @@ export default async function TeamsPage({
 
       <Card
         title="Teams"
-        description="A team's manager sees every lead belonging to its members, on top of their own reporting sub-tree."
+        description="A team's manager sees every lead belonging to its members, on top of their own reporting sub-tree. Staffing is reached only by a team flagged for it, plus Administrators and the Sales Head."
         actions={
           editingTeam === 'new' ? null : (
             <ButtonLink href="/admin/teams?edit=team:new" size="sm">
@@ -238,6 +239,7 @@ export default async function TeamsPage({
                   <TH>Department</TH>
                   <TH>Manager</TH>
                   <TH>Members</TH>
+                  <TH>Staffing</TH>
                   <TH>Status</TH>
                   <TH>
                     <span className="sr-only">Actions</span>
@@ -248,7 +250,7 @@ export default async function TeamsPage({
                 {teams.map((team) => (
                   <TR key={team.id}>
                     {editingTeam === team.id ? (
-                      <TD colSpan={6}>
+                      <TD colSpan={7}>
                         <TeamForm
                           team={team}
                           departments={optionsForTeam(team).departmentOptions}
@@ -269,6 +271,9 @@ export default async function TeamsPage({
                           )}
                         </TD>
                         <TD>{team._count.members}</TD>
+                        <TD className="text-slate-600">
+                          {team.staffingAccess ? 'Yes' : '—'}
+                        </TD>
                         <TD>
                           <ActiveBadge active={team.isActive} />
                         </TD>

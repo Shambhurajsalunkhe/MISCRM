@@ -74,7 +74,7 @@ export default async function QuotationPage({ params }: { params: Params }) {
                 href={`/clients/${quotation.lead.client.id}`}
                 className="hover:underline"
               >
-                {quotation.lead.client.companyName}
+                {quotation.lead.client.clientName}
               </a>
               {' · '}
               <a

@@ -96,7 +96,7 @@ export async function loadPayments(
         amountReceived: true,
         amountPending: true,
         status: true,
-        client: { select: { companyName: true } },
+        client: { select: { clientName: true } },
         lead: {
           select: {
             id: true,
@@ -126,7 +126,7 @@ export async function loadPayments(
   const rows: PaymentRow[] = kept.map((invoice) => ({
     id: invoice.id,
     invoiceNumber: invoice.invoiceNumber,
-    client: invoice.client.companyName,
+    client: invoice.client.clientName,
     leadCode: invoice.lead.leadCode,
     leadId: invoice.lead.id,
     vertical: invoice.lead.vertical.name,

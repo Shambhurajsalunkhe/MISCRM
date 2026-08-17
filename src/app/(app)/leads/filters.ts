@@ -149,6 +149,14 @@ export async function leadWhere(user: CurrentUser, filters: LeadFilters) {
                 { title: { contains: filters.q, mode: 'insensitive' as const } },
                 {
                   client: {
+                    clientName: {
+                      contains: filters.q,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                },
+                {
+                  client: {
                     companyName: {
                       contains: filters.q,
                       mode: 'insensitive' as const,

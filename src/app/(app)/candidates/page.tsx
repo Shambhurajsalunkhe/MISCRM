@@ -4,7 +4,10 @@ import { PERMISSIONS } from '@/lib/permissions'
 import { currencySymbol } from '@/lib/settings'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CANDIDATE_SOURCE_CHANNELS } from '@/lib/staffing/display'
-import { AccessDenied } from '@/components/access-denied'
+import {
+  AccessDenied,
+  STAFFING_ACCESS_REASON,
+} from '@/components/access-denied'
 import { ActiveBadge, Badge } from '@/components/ui/badge'
 import { ButtonLink } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/field'
@@ -37,7 +40,13 @@ export default async function CandidatesPage({
   searchParams: SearchParams
 }) {
   const viewer = await pageAccess(PERMISSIONS.STAFFING_CANDIDATE_MANAGE)
-  if (!viewer) return <AccessDenied what="the candidate master" />
+  if (!viewer)
+    return (
+      <AccessDenied
+        what="the candidate master"
+        reason={STAFFING_ACCESS_REASON}
+      />
+    )
 
   const filters = pickCandidateFilters(await searchParams)
   const query = candidateFilterQuery(filters)

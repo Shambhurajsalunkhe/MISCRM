@@ -59,7 +59,7 @@ export default async function InvoicePage({ params }: { params: Params }) {
       status: true,
       notes: true,
       leadId: true,
-      client: { select: { id: true, companyName: true } },
+      client: { select: { id: true, clientName: true } },
       lead: {
         select: {
           id: true,
@@ -140,7 +140,7 @@ export default async function InvoicePage({ params }: { params: Params }) {
                 href={`/clients/${invoice.client.id}`}
                 className="hover:underline"
               >
-                {invoice.client.companyName}
+                {invoice.client.clientName}
               </a>
               {' · '}
               <a href={`/leads/${invoice.lead.id}`} className="hover:underline">

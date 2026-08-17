@@ -36,9 +36,9 @@ export async function generateMetadata({ params }: { params: Params }) {
   const { id } = await params
   const client = await prisma.client.findUnique({
     where: { id },
-    select: { companyName: true },
+    select: { clientName: true },
   })
-  return { title: `${client?.companyName ?? 'Client'} · Sales CRM` }
+  return { title: `${client?.clientName ?? 'Client'} · Sales CRM` }
 }
 
 export default async function ClientDetailPage({ params }: { params: Params }) {
@@ -52,6 +52,7 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
     select: {
       id: true,
       clientCode: true,
+      clientName: true,
       companyName: true,
       website: true,
       companyLinkedIn: true,
@@ -153,9 +154,12 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={client.companyName}
+        title={client.clientName}
         description={[
           client.clientCode,
+          // Only when it says something the title does not — a client recorded
+          // under its company name would otherwise print it twice.
+          client.companyName !== client.clientName ? client.companyName : null,
           client.industry,
           [client.city, client.country?.name].filter(Boolean).join(', ') || null,
         ]
@@ -183,6 +187,7 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
               <ActiveBadge active={client.isActive} />
             </Detail>
             <Detail label="Owner">{client.owner?.name ?? 'Unassigned'}</Detail>
+            <Detail label="Company">{client.companyName ?? '—'}</Detail>
             <Detail label="Website">
               <ExternalLink href={client.website} />
             </Detail>

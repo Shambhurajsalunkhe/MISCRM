@@ -30,7 +30,7 @@ export function LeadPicker({
         <span className="font-medium text-slate-900">{lockedLead.leadCode}</span>
         <span className="text-slate-500">
           {' '}
-          · {lockedLead.companyName} · {lockedLead.title}
+          · {lockedLead.clientName} · {lockedLead.title}
         </span>
       </div>
     )
@@ -52,7 +52,7 @@ export function LeadPicker({
         <option value="">Choose a lead…</option>
         {leads.map((lead) => (
           <option key={lead.id} value={lead.id}>
-            {lead.leadCode} · {lead.companyName} · {lead.title}
+            {lead.leadCode} · {lead.clientName} · {lead.title}
           </option>
         ))}
       </Select>

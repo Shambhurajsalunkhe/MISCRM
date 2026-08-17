@@ -3,7 +3,7 @@
 import { useActionState } from 'react'
 
 import { ButtonLink } from '@/components/ui/button'
-import { Input, Select } from '@/components/ui/field'
+import { CheckboxField, Input, Select } from '@/components/ui/field'
 import { FormMessage, SubmitButton } from '@/components/ui/form'
 import { IDLE } from '@/lib/form'
 import { saveTeamAction } from './actions'
@@ -18,6 +18,7 @@ export function TeamForm({
     name: string
     departmentId: string | null
     managerId: string | null
+    staffingAccess: boolean
   }
   departments: Array<{ id: string; name: string }>
   managers: Array<{ id: string; name: string; roleLabel: string }>
@@ -91,6 +92,13 @@ export function TeamForm({
           Cancel
         </ButtonLink>
       </div>
+
+      <CheckboxField
+        name="staffingAccess"
+        label="This team works on staffing"
+        hint="Its members reach Requirements, Candidates and Placements, as far as their role allows. Everyone else is outside the module — Administrators and the Sales Head excepted."
+        defaultChecked={team?.staffingAccess ?? false}
+      />
     </form>
   )
 }

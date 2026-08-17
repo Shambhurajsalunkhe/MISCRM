@@ -57,6 +57,13 @@ export type PermissionMeta = {
   label: string
   /** Scope still applies: the role sees only their own or their team's records. */
   scoped?: boolean
+  /**
+   * Fenced by team membership as well as by this tick: the user must also be on
+   * a team flagged for staffing at /admin/teams, unless they are an
+   * Administrator or the Sales Head. See `hasStaffingAccess` in
+   * `src/lib/authz.ts`.
+   */
+  teamGated?: boolean
 }
 
 export const PERMISSION_GROUPS: Array<{
@@ -97,11 +104,13 @@ export const PERMISSION_GROUPS: Array<{
         permission: PERMISSIONS.STAFFING_REQUIREMENT_MANAGE,
         label: 'Manage requirements',
         scoped: true,
+        teamGated: true,
       },
       {
         permission: PERMISSIONS.STAFFING_CANDIDATE_MANAGE,
         label: 'Manage candidates & submissions',
         scoped: true,
+        teamGated: true,
       },
     ],
   },

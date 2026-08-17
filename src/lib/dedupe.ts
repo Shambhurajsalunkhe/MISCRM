@@ -10,7 +10,7 @@ import { booleanSetting } from '@/lib/settings'
  *
  * Two different mechanisms, doing two different jobs:
  *
- *  - **`dedupeKey` is a unique constraint.** Normalised company name plus email
+ *  - **`dedupeKey` is a unique constraint.** Normalised client name plus email
  *    domain. Creating a second `Acme Corp` on `acme.com` is refused outright,
  *    because that is not a second company — it is the same account entered
  *    twice, and splitting one client's leads across two rows breaks every
@@ -64,19 +64,22 @@ export async function recordDuplicateOverride(input: {
 }
 
 /**
- * Normalised company identity.
+ * Normalised client identity.
+ *
+ * Built from `clientName`, not `companyName`: the company is optional now, and a
+ * unique key that most rows leave blank collapses them onto one value.
  *
  * Lower-cased, punctuation-stripped, and with the suffixes that differ between
  * two spellings of the same company removed — `Acme Corp.`, `ACME Corporation`
  * and `Acme Inc` all collapse to `acme`. The email domain is appended when
- * there is one, so two genuinely unrelated companies called Apex still get
+ * there is one, so two genuinely unrelated clients called Apex still get
  * distinct keys as long as their contacts have addresses.
  */
 export function buildDedupeKey(
-  companyName: string,
+  clientName: string,
   emailDomain: string | null,
 ): string {
-  const name = companyName
+  const name = clientName
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(
@@ -89,7 +92,7 @@ export function buildDedupeKey(
   // An empty name after stripping — "Ltd." on its own — would collapse every
   // such client onto one key and make the second one unsavable. Fall back to
   // the raw text, which is at least distinct.
-  const base = name === '' ? companyName.toLowerCase().trim() : name
+  const base = name === '' ? clientName.toLowerCase().trim() : name
 
   return emailDomain ? `${base}@${emailDomain}` : base
 }
@@ -152,13 +155,14 @@ export function normaliseUrl(url: string | null | undefined): string | null {
 }
 
 /**
- * Look for signs that this company already exists.
+ * Look for signs that this client already exists.
  *
  * `excludeClientId` is set when editing, so a client is never reported as a
  * duplicate of itself.
  */
 export async function findClientDuplicates(input: {
-  companyName: string
+  clientName: string
+  companyName?: string | null
   website?: string | null
   companyLinkedIn?: string | null
   contactEmail?: string | null
@@ -174,16 +178,38 @@ export async function findClientDuplicates(input: {
     where: {
       ...notSelf,
       isDeleted: false,
-      companyName: { equals: input.companyName.trim(), mode: 'insensitive' },
+      clientName: { equals: input.clientName.trim(), mode: 'insensitive' },
     },
-    select: { id: true, companyName: true, clientCode: true },
+    select: { id: true, clientName: true, clientCode: true },
   })
 
   if (nameMatch) {
     warnings.push({
-      message: `${nameMatch.companyName} (${nameMatch.clientCode}) already exists with this company name.`,
+      message: `${nameMatch.clientName} (${nameMatch.clientCode}) already exists with this client name.`,
       href: `/clients/${nameMatch.id}`,
     })
+  }
+
+  // The company is a warning, never the key. Two people at the same firm are two
+  // legitimate clients on Upwork and one account in Staffing, and only the person
+  // filling the form knows which — but they cannot decide what they are not told.
+  const company = input.companyName?.trim()
+  if (company) {
+    const companyMatch = await prisma.client.findFirst({
+      where: {
+        ...notSelf,
+        isDeleted: false,
+        companyName: { equals: company, mode: 'insensitive' },
+      },
+      select: { id: true, clientName: true, clientCode: true },
+    })
+
+    if (companyMatch) {
+      warnings.push({
+        message: `${companyMatch.clientName} (${companyMatch.clientCode}) is already recorded at ${company}.`,
+        href: `/clients/${companyMatch.id}`,
+      })
+    }
   }
 
   const website = normaliseUrl(input.website)
@@ -206,12 +232,12 @@ export async function findClientDuplicates(input: {
           ? { website: { contains: value, mode: 'insensitive' as const } }
           : { companyLinkedIn: { contains: value, mode: 'insensitive' as const } }),
       },
-      select: { id: true, companyName: true, clientCode: true },
+      select: { id: true, clientName: true, clientCode: true },
     })
 
     if (match) {
       warnings.push({
-        message: `${match.companyName} (${match.clientCode}) has the same ${label}.`,
+        message: `${match.clientName} (${match.clientCode}) has the same ${label}.`,
         href: `/clients/${match.id}`,
       })
     }
@@ -314,12 +340,12 @@ export async function findContactDuplicates(input: {
         email: { equals: email, mode: 'insensitive' },
         client: { isDeleted: false },
       },
-      select: { id: true, name: true, client: { select: { id: true, companyName: true } } },
+      select: { id: true, name: true, client: { select: { id: true, clientName: true } } },
     })
 
     if (match) {
       warnings.push({
-        message: `${match.name} at ${match.client.companyName} already uses ${email}.`,
+        message: `${match.name} at ${match.client.clientName} already uses ${email}.`,
         href: `/clients/${match.client.id}`,
       })
     }
@@ -338,12 +364,12 @@ export async function findContactDuplicates(input: {
         phoneNormalised: phone,
         client: { isDeleted: false },
       },
-      select: { id: true, name: true, phone: true, client: { select: { id: true, companyName: true } } },
+      select: { id: true, name: true, phone: true, client: { select: { id: true, clientName: true } } },
     })
 
     if (match) {
       warnings.push({
-        message: `${match.name} at ${match.client.companyName} has a matching phone number (${match.phone}).`,
+        message: `${match.name} at ${match.client.clientName} has a matching phone number (${match.phone}).`,
         href: `/clients/${match.client.id}`,
       })
     }

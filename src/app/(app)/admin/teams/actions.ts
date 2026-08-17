@@ -10,6 +10,7 @@ import { MANAGERIAL_ROLES } from '@/lib/roles'
 import {
   actionError,
   actionSuccess,
+  checkboxValue,
   formValues,
   fromZodError,
   type ActionState,
@@ -98,6 +99,7 @@ export async function saveTeamAction(
     if (!parsed.success) return fromZodError(parsed.error)
 
     const { id, name, departmentId, managerId } = parsed.data
+    const staffingAccess = checkboxValue(formData, 'staffingAccess')
 
     // `@@unique([name, departmentId])` in the schema, checked here so the user
     // gets a sentence rather than a Prisma constraint error. Note that the
@@ -171,14 +173,23 @@ export async function saveTeamAction(
     if (id) {
       await prisma.team.update({
         where: { id },
-        data: { name, departmentId, managerId },
+        data: { name, departmentId, managerId, staffingAccess },
       })
     } else {
-      await prisma.team.create({ data: { name, departmentId, managerId } })
+      await prisma.team.create({
+        data: { name, departmentId, managerId, staffingAccess },
+      })
     }
 
+    // Say what the flag did, because it is the one field on this form whose
+    // effect is invisible from this screen — it decides whether a whole section
+    // of the sidebar exists for these people.
     revalidatePath('/admin/teams')
-    return actionSuccess(id ? 'Team saved.' : `${name} added.`)
+    return actionSuccess(
+      `${id ? 'Team saved' : `${name} added`}. Staffing is ${
+        staffingAccess ? 'open to' : 'hidden from'
+      } its members.`,
+    )
   })
 }
 

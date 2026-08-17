@@ -47,7 +47,7 @@ export const loadLead = cache(async (user: CurrentUser, id: string) => {
       productId: true,
       sourceId: true,
       client: {
-        select: { id: true, clientCode: true, companyName: true, country: { select: { name: true } } },
+        select: { id: true, clientCode: true, clientName: true, country: { select: { name: true } } },
       },
       primaryContact: {
         select: { id: true, name: true, designation: true, email: true, phone: true },

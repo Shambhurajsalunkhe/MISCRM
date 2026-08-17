@@ -4,7 +4,10 @@ import { PERMISSIONS } from '@/lib/permissions'
 import { currencySymbol } from '@/lib/settings'
 import { requirementVisibilityFilter } from '@/lib/visibility'
 import { formatDate, formatMoney } from '@/lib/format'
-import { AccessDenied } from '@/components/access-denied'
+import {
+  AccessDenied,
+  STAFFING_ACCESS_REASON,
+} from '@/components/access-denied'
 import { ButtonLink } from '@/components/ui/button'
 import { Input } from '@/components/ui/field'
 import { EmptyState, PageHeader } from '@/components/ui/page'
@@ -36,7 +39,8 @@ export default async function PlacementsPage({
   searchParams: SearchParams
 }) {
   const viewer = await pageAccess(PERMISSIONS.STAFFING_REQUIREMENT_MANAGE)
-  if (!viewer) return <AccessDenied what="placements" />
+  if (!viewer)
+    return <AccessDenied what="placements" reason={STAFFING_ACCESS_REASON} />
 
   const { from, to } = await searchParams
 
@@ -83,7 +87,7 @@ export default async function PlacementsPage({
             requirementCode: true,
             position: true,
             assignedTo: { select: { name: true } },
-            client: { select: { id: true, companyName: true } },
+            client: { select: { id: true, clientName: true } },
           },
         },
         lead: { select: { id: true, leadCode: true } },
@@ -254,7 +258,7 @@ export default async function PlacementsPage({
                       href={`/clients/${placement.requirement.client.id}`}
                       className="text-slate-700 hover:underline"
                     >
-                      {placement.requirement.client.companyName}
+                      {placement.requirement.client.clientName}
                     </a>
                     <div className="text-xs text-slate-500">
                       <a

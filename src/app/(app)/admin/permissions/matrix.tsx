@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useActionState } from 'react'
+import Link from 'next/link'
 
 import { Checkbox } from '@/components/ui/field'
 import {
@@ -95,6 +96,14 @@ export function PermissionMatrix({
                             ◐
                           </span>
                         ) : null}
+                        {meta.teamGated ? (
+                          <span
+                            className="ml-1.5 cursor-help text-xs text-slate-400"
+                            title="Team gated: on top of this tick, the user must be on a team flagged for staffing at /admin/teams. Administrators and the Sales Head are exempt."
+                          >
+                            ⊞
+                          </span>
+                        ) : null}
                         <span className="ml-2 font-mono text-[11px] text-slate-400">
                           {meta.permission}
                         </span>
@@ -135,7 +144,12 @@ export function PermissionMatrix({
           <SubmitButton>Save matrix</SubmitButton>
           <p className="text-xs text-slate-500">
             ◐ marks capabilities where record-level scope still applies on top
-            of the tick.
+            of the tick. ⊞ marks the staffing capabilities, which also need the
+            user to be on a team flagged for staffing under{' '}
+            <Link href="/admin/teams" className="underline">
+              Teams
+            </Link>
+            .
           </p>
         </div>
       </form>
