@@ -22,7 +22,7 @@ export default async function EditLeadPage({ params }: { params: Params }) {
   const { id } = await params
   const lead = await loadLead(viewer, id)
 
-  const [contacts, sources, services, products, symbol, canSetDealValue] =
+  const [contacts, sources, products, symbol, canSetDealValue] =
     await Promise.all([
       prisma.clientContact.findMany({
         where: { clientId: lead.client.id, isActive: true },
@@ -34,11 +34,6 @@ export default async function EditLeadPage({ params }: { params: Params }) {
           isActive: true,
           OR: [{ verticalId: null }, { verticalId: lead.vertical.id }],
         },
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-      }),
-      prisma.service.findMany({
-        where: { isActive: true },
         select: { id: true, name: true },
         orderBy: { name: 'asc' },
       }),
@@ -64,7 +59,6 @@ export default async function EditLeadPage({ params }: { params: Params }) {
           title: lead.title,
           requirementDescription: lead.requirementDescription,
           sourceId: lead.sourceId,
-          serviceId: lead.serviceId,
           productId: lead.productId,
           primaryContactId: lead.primaryContactId,
           expectedBudget: lead.expectedBudget?.toString() ?? null,
@@ -86,7 +80,6 @@ export default async function EditLeadPage({ params }: { params: Params }) {
               : contact.name,
           })),
           sources,
-          services,
           products,
         }}
         currencySymbol={symbol}

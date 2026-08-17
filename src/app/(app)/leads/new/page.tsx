@@ -66,7 +66,7 @@ export default async function NewLeadPage({
   const vertical =
     verticals.find((row) => row.id === verticalParam) ?? verticals[0]
 
-  const [sources, services, products, countries, users, sourceActivities, clients] =
+  const [sources, products, countries, users, sourceActivities, clients] =
     await Promise.all([
       // Sources are either global or scoped to one vertical, and the picker
       // must offer both — a global "Referral" applies everywhere.
@@ -75,11 +75,6 @@ export default async function NewLeadPage({
           isActive: true,
           OR: [{ verticalId: null }, { verticalId: vertical.id }],
         },
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-      }),
-      prisma.service.findMany({
-        where: { isActive: true },
         select: { id: true, name: true },
         orderBy: { name: 'asc' },
       }),
@@ -185,7 +180,6 @@ export default async function NewLeadPage({
         options={{
           verticals: verticals.map(({ id, name }) => ({ id, name })),
           sources,
-          services,
           products,
           countries,
           users: users.map((user) => ({

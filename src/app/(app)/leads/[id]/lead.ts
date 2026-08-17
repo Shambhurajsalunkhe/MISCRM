@@ -43,7 +43,6 @@ export const loadLead = cache(async (user: CurrentUser, id: string) => {
       createdAt: true,
       currentStageId: true,
       primaryContactId: true,
-      serviceId: true,
       productId: true,
       sourceId: true,
       client: {
@@ -82,7 +81,6 @@ export const loadLead = cache(async (user: CurrentUser, id: string) => {
           user: { select: { name: true } },
         },
       },
-      service: { select: { name: true } },
       product: { select: { name: true } },
       lostReason: { select: { name: true } },
       generatedBy: { select: { id: true, name: true } },

@@ -478,8 +478,22 @@ const GENERIC_SOURCES = [
   'Website',
   'Direct Inquiry',
   'Existing Client',
-  'Event / Conference',
+  'LinkedIn',
+  'Upwork',
+  'YouTube',
+  'Marketing',
+  'Others',
 ]
+
+/**
+ * Sources that were seeded once and should no longer be offered.
+ *
+ * Deactivated rather than deleted: a lead that was recorded against one still
+ * points at it, and deleting the row would either fail on the foreign key or
+ * rewrite history that somebody reported on. `isActive: false` takes it out of
+ * every picker while leaving those leads readable.
+ */
+const RETIRED_SOURCES = ['Event / Conference']
 
 const APP_SETTINGS = [
   { key: 'currency', value: 'USD', description: 'Base reporting currency (decision D4)' },
@@ -622,7 +636,22 @@ async function seedMasterData() {
     })
     if (!existing) {
       await prisma.leadSource.create({ data: { name } })
+    } else if (!existing.isActive) {
+      // A source that is back on the list is switched back on. Without this, a
+      // name that was once retired could never return, because the row already
+      // exists and the branch above would skip it.
+      await prisma.leadSource.update({
+        where: { id: existing.id },
+        data: { isActive: true },
+      })
     }
+  }
+
+  for (const name of RETIRED_SOURCES) {
+    await prisma.leadSource.updateMany({
+      where: { name, verticalId: null },
+      data: { isActive: false },
+    })
   }
 
   console.log('→ Lost reasons')

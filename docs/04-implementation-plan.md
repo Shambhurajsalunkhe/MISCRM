@@ -528,6 +528,52 @@ reports for anyone who may read those reports. The fence is around the module,
 not around the company's totals — a Manager reading Won Revenue still sees what
 staffing contributed to it without being able to open a candidate.
 
+**The lead form loses two fields and gains five sources.** Three changes asked
+for together, all of them about what a person is made to type before a lead
+exists.
+
+*Contact name is gone from the new-client branch.* The client name directly above
+it is that person's name whenever the client is a person, which outside Staffing
+and Product Sales it usually is — so the field asked most people to type the same
+thing twice. What made this more than deleting a `<Field>` is that
+`resolveClient` created the primary contact **only if a contact name was given**:
+removing the field alone would have thrown away the email and phone beside it and
+left every new client with no contact at all. The condition is now "an email or a
+phone was given", and the contact is named after the client. A separately-named
+contact is still added on the client page, where a company can have several.
+
+*Service is gone from both lead forms.* The requirement line and its description
+are how the work gets described, and a second fixed taxonomy on top of them was
+one more list to keep current without letting any report answer anything new.
+Product Sales keeps its product picker. `serviceId` was removed from `leadSchema`
+rather than merely from the forms, because the update action parses that same
+object — leaving it in would have made an absent field resolve to null and blank
+the service on every legacy lead the next time somebody saved an unrelated edit,
+which is the trap the file already documents for `sourceActivityId`. Nothing
+writes the column now, so existing values stay readable in the database; the
+`Service` fact on the lead page and the `Service` column in the leads CSV are
+gone, since neither could ever be filled again. `/admin/master/services` still
+exists and now edits a catalogue nothing consumes — worth deciding on.
+
+*The global source list is now* Direct Inquiry, Existing Client, LinkedIn,
+Marketing, Others, Partner, Referral, Upwork, Website and YouTube. "Event /
+Conference" was retired by setting `isActive: false` rather than deleting the
+row: a lead recorded against it still points at it, and deleting would either
+fail on the foreign key or rewrite history somebody has reported on. The seed
+gained a `RETIRED_SOURCES` list for that, and the create branch now re-activates
+a name that returns to the list — without which a once-retired source could never
+come back, because the row already exists. Note that four of the new names are
+also verticals, so the Upwork form offers "Upwork" as a source; that is what a
+source means here — where the enquiry came in from — and it is per-lead rather
+than per-vertical, so nothing stops it.
+
+Every picker reads active sources from the database, so the lead form, the edit
+form, the leads filter bar, the dashboard filters and the lead-source report all
+changed together with no code edit. The dev database was updated by a targeted
+script rather than by re-running the seed, because a re-seed resets any
+`/admin/permissions` toggles an administrator has made — the seed itself carries
+the new list for fresh installs.
+
 ### Phase 8 — Optional, on your word
 Automation rules engine, targets and quotas (open question Q6), external
 integrations (Q4), mobile-responsive refinements.

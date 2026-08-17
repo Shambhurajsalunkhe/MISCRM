@@ -39,7 +39,6 @@ function hasTypedContent(form: HTMLFormElement | null): boolean {
 export type LeadFormOptions = {
   verticals: Array<{ id: string; name: string }>
   sources: Array<{ id: string; name: string }>
-  services: Array<{ id: string; name: string }>
   products: Array<{ id: string; name: string }>
   countries: Array<{ id: string; name: string }>
   users: Array<{ id: string; name: string; roleLabel: string }>
@@ -233,17 +232,19 @@ export function LeadForm({
                 </Select>
               </Field>
 
-              <Field
-                label="Contact name"
-                htmlFor="contactName"
-                error={errors.contactName}
-              >
-                <Input id="contactName" name="contactName" />
-              </Field>
-
+              {/*
+               * No contact name here. The client name above is the contact's
+               * name whenever the client is a person, which outside Staffing and
+               * Product Sales it usually is — so the field asked most people to
+               * type the same thing twice. An email or a phone still creates the
+               * primary contact; see resolveClient in ../actions.ts, which names
+               * it after the client. A separately-named contact is added on the
+               * client page, where a company can have several.
+               */}
               <Field
                 label="Contact email"
                 htmlFor="contactEmail"
+                hint="Either of these saves a primary contact under the client name above."
                 error={errors.contactEmail}
               >
                 <Input id="contactEmail" name="contactEmail" type="email" />
@@ -252,6 +253,7 @@ export function LeadForm({
               <Field
                 label="Contact phone"
                 htmlFor="contactPhone"
+                hint="Rename the contact, or add more, from the client page."
                 error={errors.contactPhone}
               >
                 <Input id="contactPhone" name="contactPhone" />
@@ -351,7 +353,14 @@ export function LeadForm({
             <Textarea id="requirementDescription" name="requirementDescription" />
           </Field>
 
-          {layout.catalogue === 'product' ? (
+          {/*
+           * Product Sales picks from the product catalogue. Every other vertical
+           * used to pick a service here; that field is gone — the requirement
+           * line and its description are how the work is described, and a second
+           * fixed taxonomy on top of them was one more thing to keep current
+           * without changing what any report could answer.
+           */}
+          {layout.showProduct ? (
             <Field label="Product" htmlFor="productId">
               <Select id="productId" name="productId" defaultValue="">
                 <option value="">Not set</option>
@@ -362,18 +371,7 @@ export function LeadForm({
                 ))}
               </Select>
             </Field>
-          ) : (
-            <Field label="Service" htmlFor="serviceId">
-              <Select id="serviceId" name="serviceId" defaultValue="">
-                <option value="">Not set</option>
-                {options.services.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {service.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          )}
+          ) : null}
 
           <Field label="Source" htmlFor="sourceId">
             <Select id="sourceId" name="sourceId" defaultValue="">

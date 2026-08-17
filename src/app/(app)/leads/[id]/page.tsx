@@ -44,7 +44,6 @@ export default async function LeadOverviewPage({ params }: { params: Params }) {
               '—'
             )}
           </Fact>
-          <Fact label="Service">{lead.service?.name ?? '—'}</Fact>
           <Fact label="Product">{lead.product?.name ?? '—'}</Fact>
           <Fact label="Source">{lead.source?.name ?? '—'}</Fact>
           <Fact label="Expected budget">

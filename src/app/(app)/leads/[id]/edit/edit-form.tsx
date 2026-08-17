@@ -17,7 +17,6 @@ export type LeadEditValues = {
   title: string
   requirementDescription: string | null
   sourceId: string | null
-  serviceId: string | null
   productId: string | null
   primaryContactId: string | null
   expectedBudget: string | null
@@ -51,7 +50,6 @@ export function LeadEditForm({
   options: {
     contacts: Array<{ id: string; label: string }>
     sources: Array<{ id: string; name: string }>
-    services: Array<{ id: string; name: string }>
     products: Array<{ id: string; name: string }>
   }
   currencySymbol: string
@@ -127,7 +125,7 @@ export function LeadEditForm({
             </Select>
           </Field>
 
-          {layout.catalogue === 'product' ? (
+          {layout.showProduct ? (
             <Field label="Product" htmlFor="productId">
               <Select
                 id="productId"
@@ -142,22 +140,7 @@ export function LeadEditForm({
                 ))}
               </Select>
             </Field>
-          ) : (
-            <Field label="Service" htmlFor="serviceId">
-              <Select
-                id="serviceId"
-                name="serviceId"
-                defaultValue={lead.serviceId ?? ''}
-              >
-                <option value="">Not set</option>
-                {options.services.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {service.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          )}
+          ) : null}
 
           <Field
             label={`Expected budget (${currencySymbol})`}

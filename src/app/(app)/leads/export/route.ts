@@ -60,7 +60,6 @@ export async function GET(request: Request) {
       primaryContact: { select: { name: true, email: true, phone: true } },
       vertical: { select: { name: true } },
       source: { select: { name: true } },
-      service: { select: { name: true } },
       product: { select: { name: true } },
       currentStage: { select: { name: true } },
       generatedBy: { select: { name: true } },
@@ -83,7 +82,6 @@ export async function GET(request: Request) {
     { header: 'Contact phone', value: (lead) => lead.primaryContact?.phone },
     { header: 'Vertical', value: (lead) => lead.vertical.name },
     { header: 'Source', value: (lead) => lead.source?.name },
-    { header: 'Service', value: (lead) => lead.service?.name },
     { header: 'Product', value: (lead) => lead.product?.name },
     { header: 'Stage', value: (lead) => lead.currentStage?.name },
     {

@@ -97,7 +97,7 @@ Every report: filter bar, drill-through, Excel and PDF export.
 | `/admin/master/verticals` | Verticals, prefixes, module switches |
 | `/admin/master/stages` | Pipeline, requirement and candidate stage lists with common-stage mapping and aging thresholds |
 | `/admin/master/sources` | Lead sources |
-| `/admin/master/services`, `/products` | Service and product catalogue |
+| `/admin/master/services`, `/products` | Service and product catalogue. Nothing reads the service catalogue since the lead form stopped offering a service — the screen still edits the table, but no other screen shows the result. Decide whether it goes. |
 | `/admin/master/countries` | Countries |
 | `/admin/master/lost-reasons` | Lost reasons, global or per vertical |
 | `/admin/master/tags` | Tags |

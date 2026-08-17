@@ -41,8 +41,8 @@ import type { CurrentUser } from '@/lib/auth/session'
 
 /**
  * These come from `@/lib/form-fields` rather than being defined here because
- * this form is the reason they exist: it renders a product picker *or* a
- * service picker, and the campaign field only for Digital Marketing, so those
+ * this form is the reason they exist: it renders a product picker only for
+ * Product Sales, and the campaign field only for Digital Marketing, so those
  * keys are simply absent from the payload rather than blank. See that module
  * for what went wrong when the schemas rejected `undefined`.
  */
@@ -51,7 +51,12 @@ const leadSchema = z.object({
   title: z.string().trim().min(3, 'Summarise the requirement.').max(200),
   requirementDescription: optionalText(4000),
   sourceId: optionalId,
-  serviceId: optionalId,
+  // No `serviceId`. Neither lead form offers a service any more, and leaving it
+  // in the schema would be worse than removing it: the update action parses this
+  // same object, so an absent field would resolve to null and blank the service
+  // on every legacy lead the next time somebody saved an unrelated edit — the
+  // trap already noted for `sourceActivityId` below. Existing values stay put
+  // because nothing writes the column.
   productId: optionalId,
   expectedBudget: optionalMoney,
   expectedTimeline: optionalText(120),
@@ -73,7 +78,6 @@ const newClientSchema = z.object({
   companyName: optionalText(200),
   website: optionalUrl(300),
   countryId: optionalId,
-  contactName: optionalText(120),
   contactEmail: optionalText(200),
   contactPhone: optionalText(60),
 })
@@ -177,18 +181,25 @@ async function resolveClient(
         select: { id: true },
       })
 
-      const contact = data.contactName
-        ? await tx.clientContact.create({
-            data: {
-              clientId: client.id,
-              name: data.contactName,
-              email: data.contactEmail,
-              ...contactPhoneFields(data.contactPhone),
-              isPrimary: true,
-            },
-            select: { id: true },
-          })
-        : null
+      // The lead form no longer asks for a contact name — the client name is
+      // that name whenever the client is a person. So an email or a phone is
+      // now what says "there is someone to contact here", and the contact is
+      // named after the client. Gating on the name instead would silently drop
+      // the email and phone that were typed, leaving the client with no
+      // contact at all.
+      const contact =
+        data.contactEmail || data.contactPhone
+          ? await tx.clientContact.create({
+              data: {
+                clientId: client.id,
+                name: data.clientName,
+                email: data.contactEmail,
+                ...contactPhoneFields(data.contactPhone),
+                isPrimary: true,
+              },
+              select: { id: true },
+            })
+          : null
 
       return { clientId: client.id, contactId: contact?.id ?? null }
     })
@@ -300,7 +311,6 @@ export async function createLeadAction(
           primaryContactId: client.contactId,
           verticalId: vertical.id,
           sourceId: data.sourceId,
-          serviceId: data.serviceId,
           productId: data.productId,
           title: data.title,
           requirementDescription: data.requirementDescription,

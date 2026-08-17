@@ -24,8 +24,16 @@ export type VerticalModules = {
 }
 
 export type LeadFormLayout = {
-  /** Catalogue picker: a service for delivery work, a product for Product Sales. */
-  catalogue: 'service' | 'product' | 'none'
+  /**
+   * Whether to offer the product catalogue.
+   *
+   * This was `catalogue: 'service' | 'product' | 'none'` while delivery work
+   * picked a service here. The service field is gone, which left one of those
+   * three cases meaning "render nothing" and the third never returned at all —
+   * a type advertising choices the code no longer makes. A boolean says the one
+   * thing that is still true.
+   */
+  showProduct: boolean
   showCampaign: boolean
   reference: { label: string; hint?: string } | null
   /** Shown under the header: what happens to this lead after it is created. */
@@ -46,9 +54,7 @@ const REFERENCE_LABELS: Record<string, { label: string; hint?: string }> = {
 
 export function leadFormLayout(vertical: VerticalModules): LeadFormLayout {
   return {
-    catalogue: vertical.usesDemos || vertical.usesQuotations
-      ? 'product'
-      : 'service',
+    showProduct: vertical.usesDemos || vertical.usesQuotations,
 
     // Campaigns are what Digital Marketing counts leads against, and contracts
     // are the switch that identifies it. Anywhere else the field is noise.
