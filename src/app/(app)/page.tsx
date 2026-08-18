@@ -433,9 +433,7 @@ export default async function DashboardPage({
 function scopeSentence(role: string): string {
   switch (role) {
     case 'ADMIN':
-    case 'SALES_HEAD':
       return 'every lead in the company'
-    case 'MANAGER':
     case 'BDM':
       return 'your leads and those of everyone reporting to you'
     default:

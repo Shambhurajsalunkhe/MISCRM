@@ -14,9 +14,9 @@ import type { CurrentUser } from '@/lib/auth/session'
  * scope of decision D7, which already answers the same question for every other
  * record in the app:
  *
- *   BDE                 -> themselves only
- *   BDM / MANAGER       -> themselves and their reporting sub-tree
- *   SALES_HEAD / ADMIN  -> anyone
+ *   BDE    -> themselves only
+ *   BDM    -> themselves and their reporting sub-tree
+ *   ADMIN  -> anyone
  *
  * That is the behaviour the screen needs. A manager catching up a week for
  * someone who was travelling is normal; a BDE quietly editing a colleague's

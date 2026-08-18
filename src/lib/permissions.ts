@@ -60,7 +60,7 @@ export type PermissionMeta = {
   /**
    * Fenced by team membership as well as by this tick: the user must also be on
    * a team flagged for staffing at /admin/teams, unless they are an
-   * Administrator or the Sales Head. See `hasStaffingAccess` in
+   * Administrator. See `hasStaffingAccess` in
    * `src/lib/authz.ts`.
    */
   teamGated?: boolean
@@ -168,18 +168,13 @@ const BDM_PERMISSIONS: Permission[] = [
   PERMISSIONS.REPORT_REVENUE,
   PERMISSIONS.REPORT_PERFORMANCE,
   PERMISSIONS.DATA_EXPORT,
-]
 
-const MANAGER_PERMISSIONS: Permission[] = [
-  ...BDM_PERMISSIONS,
+  // Held by the former MANAGER tier, which a BDM now is. `commercial.payment`
+  // is the one worth naming: raising an invoice and recording the money against
+  // it are now the same person's job, so the second pair of eyes the split used
+  // to imply is gone. Deliberate — see docs/00-decisions.md D13.
   PERMISSIONS.LEAD_DELETE,
   PERMISSIONS.COMMERCIAL_PAYMENT,
-]
-
-const SALES_HEAD_PERMISSIONS: Permission[] = [
-  ...MANAGER_PERMISSIONS,
-  PERMISSIONS.ADMIN_USERS,
-  PERMISSIONS.ADMIN_AUDIT,
 ]
 
 /**
@@ -190,7 +185,5 @@ const SALES_HEAD_PERMISSIONS: Permission[] = [
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   BDE: BDE_PERMISSIONS,
   BDM: BDM_PERMISSIONS,
-  MANAGER: MANAGER_PERMISSIONS,
-  SALES_HEAD: SALES_HEAD_PERMISSIONS,
   ADMIN: ALL_PERMISSIONS,
 }

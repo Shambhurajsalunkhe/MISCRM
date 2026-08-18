@@ -70,17 +70,17 @@ const BDM = [
   'report.revenue',
   'report.performance',
   'data.export',
+
+  // Formerly the MANAGER tier, which a BDM now is (D13).
+  'lead.delete',
+  'commercial.payment',
 ]
 
-const MANAGER = [...BDM, 'lead.delete', 'commercial.payment']
-const SALES_HEAD = [...MANAGER, 'admin.users', 'admin.audit']
 const ADMIN = [...PERMISSION_KEYS]
 
 const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   BDE,
   BDM,
-  MANAGER,
-  SALES_HEAD,
   ADMIN,
 }
 

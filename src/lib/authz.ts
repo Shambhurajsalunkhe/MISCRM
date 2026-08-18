@@ -51,11 +51,12 @@ const STAFFING_PERMISSIONS = new Set<string>([
 ])
 
 /**
- * Roles that reach staffing without belonging to a staffing team. Admin
- * administers it and Sales Head owns the whole pipeline, so locking either out
- * of a vertical they are accountable for would only produce a support call.
+ * Roles that reach staffing without belonging to a staffing team. Admin only:
+ * it administers the module, and locking it out of a vertical it is accountable
+ * for would only produce a support call. This was ['ADMIN', 'SALES_HEAD'] until
+ * the role set went to three (D13); the fence itself did not change.
  */
-const STAFFING_EXEMPT_ROLES: UserRole[] = ['ADMIN', 'SALES_HEAD']
+const STAFFING_EXEMPT_ROLES: UserRole[] = ['ADMIN']
 
 const teamStaffingAccess = cache(async (teamId: string) => {
   const team = await prisma.team.findUnique({

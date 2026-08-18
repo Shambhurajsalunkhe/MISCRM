@@ -8,16 +8,16 @@ import type { CurrentUser } from '@/lib/auth/session'
 /**
  * Data scope (decision D7, docs/01-data-model.md §5).
  *
- *   ADMIN / SALES_HEAD  -> everything
- *   MANAGER / BDM       -> self + everyone in their reporting sub-tree
- *   BDE                 -> self only
+ *   ADMIN  -> everything
+ *   BDM    -> self + everyone in their reporting sub-tree
+ *   BDE    -> self only
  *
  * Returning `null` means "no restriction". Callers must treat `null` and
  * `[]` differently — an empty array means the user can see nothing.
  */
 export const visibleUserIds = cache(
   async (user: CurrentUser): Promise<string[] | null> => {
-    if (user.role === 'ADMIN' || user.role === 'SALES_HEAD') {
+    if (user.role === 'ADMIN') {
       return null
     }
 
@@ -25,7 +25,7 @@ export const visibleUserIds = cache(
       return [user.id]
     }
 
-    // MANAGER / BDM: walk the reporting chain downwards, plus anyone in a team
+    // BDM: walk the reporting chain downwards, plus anyone in a team
     // they manage. Depth is bounded to stop a mis-configured cycle from
     // spinning; org charts are never 20 levels deep.
     const rows = await prisma.$queryRaw<Array<{ id: string }>>`

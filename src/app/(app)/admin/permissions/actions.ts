@@ -20,7 +20,7 @@ import type { CurrentUser } from '@/lib/auth/session'
  *
  * Gating it on `admin.master` alone was an escalation path: `admin.master` is
  * itself one of the cells in this grid, so an administrator who granted it to,
- * say, MANAGER would have handed managers the ability to edit the grid — and
+ * say, BDM would have handed every BDM the ability to edit the grid — and
  * from there to grant themselves every remaining capability, including
  * `admin.users`. A permission that can widen itself is not a boundary.
  *

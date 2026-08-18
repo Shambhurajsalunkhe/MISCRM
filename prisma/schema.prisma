@@ -23,8 +23,6 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  SALES_HEAD
-  MANAGER
   BDM
   BDE
 }

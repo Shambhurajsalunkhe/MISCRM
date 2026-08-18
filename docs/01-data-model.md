@@ -173,10 +173,15 @@ Every list query is wrapped by a scope filter resolved from the signed-in user:
 
 | Role | Sees |
 |---|---|
-| `ADMIN`, `SALES_HEAD` | everything |
-| `MANAGER` | own records + every user in teams they manage + their whole reporting sub-tree |
-| `BDM` | own records + direct reports' records |
+| `ADMIN` | everything |
+| `BDM` | own records + every user in teams they manage + their whole reporting sub-tree |
 | `BDE` | leads where they are `generatedById` **or** `assignedToId` |
+
+The BDM row is not a widening. `visibleUserIds` always ran BDM and the former
+MANAGER down the same branch — full sub-tree plus managed teams — so the earlier
+"direct reports' records" here described the intent rather than the code. With
+MANAGER gone (D13) the two descriptions collapse into the one the code has always
+implemented.
 
 The sub-tree is resolved with a recursive CTE over `User.reportingManagerId`,
 cached per request:
@@ -197,8 +202,8 @@ person.
 **Clients are scoped slightly wider than leads.** A client is visible to its
 owner *and* to anyone who can see one of its leads: a BDE who sourced `UP-0042`
 has to be able to open the account page to add the contact they just spoke to.
-An unowned client with no leads is therefore visible only to Sales Head and
-Admin, which is the right default and is fixed by setting an owner.
+An unowned client with no leads is therefore visible only to an Admin, which is
+the right default and is fixed by setting an owner.
 
 ---
 

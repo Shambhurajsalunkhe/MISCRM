@@ -18,7 +18,7 @@ import {
   type ActionState,
 } from '@/lib/form'
 
-const ROLES = ['ADMIN', 'SALES_HEAD', 'MANAGER', 'BDM', 'BDE'] as const
+const ROLES = ['ADMIN', 'BDM', 'BDE'] as const
 
 /** Blank <select> and <input> values arrive as '' and mean "not set". */
 const optionalId = z

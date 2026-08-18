@@ -40,9 +40,12 @@ import type { PaymentMode } from '@/generated/prisma/enums'
  * importer or a report without re-implementing "may this person do it".
  *
  * Two permissions, deliberately different (docs/03 §2): raising and amending an
- * invoice is `commercial.manage`, which a BDM holds; recording a payment is
- * `commercial.payment`, which starts at Manager. Money arriving is a different
- * kind of claim from money being asked for, and the matrix says so.
+ * invoice is `commercial.manage` and recording a payment is
+ * `commercial.payment`. Both now sit with the BDM: the Manager tier that used to
+ * hold the second one was removed (D13), so the separation between asking for
+ * money and recording its arrival is no longer enforced by role. The two
+ * permissions stay distinct so it can be re-drawn from /admin/permissions
+ * without a deployment.
  */
 
 const invoiceSchema = z.object({

@@ -119,9 +119,9 @@ export function ReportingHierarchy({ users }: { users: HierarchyUser[] }) {
         ))}
       </ul>
       <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
-        This tree is what data visibility is derived from: a Manager or BDM sees
-        their own records plus everything belonging to anyone beneath them here,
-        and anyone in a team they manage.
+        This tree is what data visibility is derived from: a BDM sees their own
+        records plus everything belonging to anyone beneath them here, and
+        anyone in a team they manage.
       </p>
     </>
   )

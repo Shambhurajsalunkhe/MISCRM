@@ -13,9 +13,9 @@
 ### Dashboard (README §24–§26)
 | Route | Screen |
 |---|---|
-| `/` | Role-aware dashboard. Sales Head/Admin see the org view; BDM sees team; BDE sees own |
+| `/` | Role-aware dashboard. Admin sees the org view; BDM sees team; BDE sees own |
 
-**Sales Head layout, matching your flowchart panel 4:**
+**Admin layout, matching your flowchart panel 4:**
 - KPI row — Total Leads, Open, Won, Lost, Won Revenue, Collected Revenue, Pending Revenue, Overall Conversion
 - Leads by Vertical — donut with counts and share %
 - Conversion by Vertical — table: vertical, input metric, leads, won, conversion %
@@ -119,36 +119,36 @@ Every report: filter bar, drill-through, Excel and PDF export.
 
 `✓` full · `◐` own/team scope only · `–` no access · `⊞` team-gated as well
 
-| Capability | BDE | BDM | Manager | Sales Head | Admin |
-|---|:--:|:--:|:--:|:--:|:--:|
-| Create lead | ✓ | ✓ | ✓ | ✓ | ✓ |
-| View leads | ◐ | ◐ | ◐ | ✓ | ✓ |
-| Edit lead (client/requirement) | ◐ | ◐ | ◐ | ✓ | ✓ |
-| Change stage | – | ◐ | ◐ | ✓ | ✓ |
-| Assign / reassign lead | ◐ | ◐ | ◐ | ✓ | ✓ |
-| Set deal value / mark Won-Lost | – | ◐ | ◐ | ✓ | ✓ |
-| Delete (soft) lead | – | – | ◐ | ✓ | ✓ |
-| Log prospecting counters | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Add activities & documents | ◐ | ◐ | ◐ | ✓ | ✓ |
-| Manage staffing requirements | –⊞ | ◐⊞ | ◐⊞ | ✓ | ✓ |
-| Manage candidates & submissions | ◐⊞ | ◐⊞ | ◐⊞ | ✓ | ✓ |
-| Contracts / quotations / invoices | – | ◐ | ◐ | ✓ | ✓ |
-| Record payments | – | – | ◐ | ✓ | ✓ |
-| View revenue KPIs | – | ◐ | ◐ | ✓ | ✓ |
-| BDE / BDM performance reports | – | ◐ | ◐ | ✓ | ✓ |
-| All other reports | – | ◐ | ◐ | ✓ | ✓ |
-| Export data | – | ◐ | ◐ | ✓ | ✓ |
-| Manage users & teams | – | – | – | ✓ | ✓ |
-| Manage master data | – | – | – | – | ✓ |
-| View audit log | – | – | – | ✓ | ✓ |
+| Capability | BDE | BDM | Admin |
+|---|:--:|:--:|:--:|
+| Create lead | ✓ | ✓ | ✓ |
+| View leads | ◐ | ◐ | ✓ |
+| Edit lead (client/requirement) | ◐ | ◐ | ✓ |
+| Change stage | – | ◐ | ✓ |
+| Assign / reassign lead | ◐ | ◐ | ✓ |
+| Set deal value / mark Won-Lost | – | ◐ | ✓ |
+| Delete (soft) lead | – | ◐ | ✓ |
+| Log prospecting counters | ✓ | ✓ | ✓ |
+| Add activities & documents | ◐ | ◐ | ✓ |
+| Manage staffing requirements | –⊞ | ◐⊞ | ✓ |
+| Manage candidates & submissions | ◐⊞ | ◐⊞ | ✓ |
+| Contracts / quotations / invoices | – | ◐ | ✓ |
+| Record payments | – | ◐ | ✓ |
+| View revenue KPIs | – | ◐ | ✓ |
+| BDE / BDM performance reports | – | ◐ | ✓ |
+| All other reports | – | ◐ | ✓ |
+| Export data | – | ◐ | ✓ |
+| Manage users & teams | – | – | ✓ |
+| Manage master data | – | – | ✓ |
+| View audit log | – | – | ✓ |
 
 **The two `⊞` rows are fenced by team as well as by role.** Recruitment is one
 team's work inside the single Sales department, so a tick in this grid is only
 half the answer for staffing — the person must also be on a team flagged *This
-team works on staffing* at `/admin/teams`. Administrators and the Sales Head are
-exempt: one administers the module and the other owns every vertical's numbers.
+team works on staffing* at `/admin/teams`. Administrators are exempt, being the
+role that administers the module.
 
-Everyone else — Managers, BDMs and BDEs outside that team — has no Staffing
+Everyone else — BDMs and BDEs outside that team — has no Staffing
 section in the sidebar, cannot reach `/requirements`, `/candidates` or
 `/placements` by URL, gets no Requirements tab on a staffing lead, and sees no
 requirement or candidate hits in global search. The check lives in one place,
@@ -182,7 +182,7 @@ Two rows worth confirming, since README §32 leaves them open:
 | Follow-up due today / overdue | activity owner |
 | Proposal or negotiation idle past threshold | assigned BDM + manager |
 | Interview scheduled / feedback pending | recruiter + BDM |
-| Payment due in 3 days / overdue | assigned BDM + Sales Head |
+| Payment due in 3 days / overdue | assigned BDM + Admin |
 | Lead ageing past stage threshold | assigned BDM + manager |
 
 Each row is a `NotificationRule`, so Admin can switch in-app and email delivery

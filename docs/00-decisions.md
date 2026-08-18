@@ -75,11 +75,26 @@ This also powers the Pipeline Aging report (§29).
 
 ### D13 — Roles are a fixed set with a configurable permission matrix
 
-**Decision:** Five system roles (`ADMIN`, `SALES_HEAD`, `MANAGER`, `BDM`, `BDE`) with a
-`RolePermission` table so Admin can toggle individual capabilities without code changes.
+**Decision:** Three system roles (`ADMIN`, `BDM`, `BDE`) with a `RolePermission`
+table so Admin can toggle individual capabilities without code changes.
 
 **Source:** §32 defines three role groups; §33 requires Roles to be manageable; the
 flowchart's master-data panel lists `Roles & Permissions`.
+
+**Revised 18 Aug 2026 — five roles became three.** `MANAGER` and `SALES_HEAD`
+were removed. Neither named a distinct job: a BDM already held exactly the data
+scope a Manager held (`visibleUserIds` walked them down the same branch) and
+differed only by `lead.delete` and `commercial.payment`, so "Manager" was a
+second name for the same seat; and the Sales Head signs in as an administrator
+and creates further administrators, which left `SALES_HEAD` distinguished from
+`ADMIN` by `admin.master` alone. Both permissions the Manager tier held moved to
+BDM.
+
+The consequence worth stating: `commercial.manage` and `commercial.payment` now
+sit with the same role, so raising an invoice and recording the money against it
+are one person's job. That separation was previously enforced by the tier
+boundary. The two permissions remain distinct keys, so it can be re-drawn from
+/admin/permissions without a deployment — but by default it is not drawn.
 
 ---
 

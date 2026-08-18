@@ -400,5 +400,5 @@ that produced it:
 KPI card  →  Vertical breakdown  →  Lead list (filtered)  →  Lead detail  →  Timeline
 ```
 
-The filter state lives in the URL, so any view a Sales Head is looking at can be
+The filter state lives in the URL, so any view somebody is looking at can be
 copied and sent to someone else.

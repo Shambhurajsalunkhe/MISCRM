@@ -198,7 +198,7 @@ right place for a question the plan flagged as most likely to need revisiting.
 - **Logging on someone else's behalf reuses the D7 data scope**, not a new
   permission. The matrix has one prospecting row, held by everyone, and says
   nothing about whose counters you may enter — so a BDE gets themselves, a
-  BDM/Manager their reporting sub-tree, and Sales Head/Admin anyone. A manager
+  BDM their reporting sub-tree, and an Admin anyone. A manager
   catching up a week for someone who was travelling is normal; a BDE editing a
   colleague's pitch count is not, and BDE Performance (README §27) is read off
   precisely these numbers.
@@ -573,6 +573,40 @@ changed together with no code edit. The dev database was updated by a targeted
 script rather than by re-running the seed, because a re-seed resets any
 `/admin/permissions` toggles an administrator has made — the seed itself carries
 the new list for fresh installs.
+
+**Five roles became three.** `MANAGER` and `SALES_HEAD` are gone; `ADMIN`, `BDM`
+and `BDE` remain. Neither departing role named a distinct job. `visibleUserIds`
+had always walked BDM and MANAGER down the same branch — full reporting sub-tree
+plus any team they manage — so the two differed only by `lead.delete` and
+`commercial.payment`, which is a permission difference rather than a role. And
+the Sales Head signs in as an administrator and creates further administrators,
+which left `SALES_HEAD` distinguished from `ADMIN` by `admin.master` alone.
+
+Both permissions the Manager tier held moved to BDM, which is the one part of
+this with a consequence rather than a simplification: `commercial.manage` and
+`commercial.payment` now sit with the same role, so raising an invoice and
+recording the money against it are one person's job. The tier boundary used to
+enforce that separation. The keys stay distinct so it can be re-drawn from
+`/admin/permissions` without a deployment — but by default it is not drawn.
+
+This also narrows the staffing fence recorded above: `STAFFING_EXEMPT_ROLES` is
+now `['ADMIN']`, because the role it used to also name no longer exists. The
+fence itself is unchanged — a BDM still needs a team flagged for staffing.
+
+Removing a value from a PostgreSQL enum needs the type rebuilt, so
+`20260818120000_three_roles` recreates `UserRole` and re-points the three columns
+that carry it (`User.role`, `RolePermission.role`, `NotificationRule.role`). It
+re-points any surviving `MANAGER` user to BDM and any `SALES_HEAD` to ADMIN
+first. Nobody held either role when it ran — BDM 3, BDE 2, ADMIN 1, MANAGER 0,
+SALES_HEAD 0 — but the cast fails outright on a surviving row, so the re-pointing
+is what stops the migration corrupting the first database where the set is not
+empty.
+
+The matrix rows are data, not code: the seed writes all twenty permissions per
+role and carries the answer in `allowed`, so BDM's two new capabilities were two
+flags to flip rather than rows to insert, and the departing roles' forty rows
+were deleted. That had to happen inside the migration — running the seed would
+have reset every permission toggle an administrator had made.
 
 ### Phase 8 — Optional, on your word
 Automation rules engine, targets and quotas (open question Q6), external
