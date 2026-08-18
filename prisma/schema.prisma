@@ -1234,9 +1234,22 @@ model Activity {
   type         ActivityType
   subject      String
   notes        String?
+  /// When it happened, or -- when `isPlanned` -- when it is due to happen.
   activityDate DateTime     @default(now())
   outcome      String?
   followUpDate DateTime?
+  /// This row is a plan, not a record: a call or meeting arranged for
+  /// `activityDate` in the future rather than one that has taken place.
+  ///
+  /// One column rather than a second table because a planned call and a logged
+  /// call carry the same fields, and completing one is a state change rather
+  /// than a copy: marking it done clears this flag and the row becomes the
+  /// history entry for the call that happened. Defaults false, so every row
+  /// written before this existed stays what it was: a record.
+  ///
+  /// Every timeline reading history must filter `isPlanned: false`, or a call
+  /// arranged for next Tuesday reads as one that already happened.
+  isPlanned    Boolean      @default(false)
   userId       String
 
   // Attach to whichever entity the activity belongs to
@@ -1257,6 +1270,7 @@ model Activity {
   updatedAt DateTime @updatedAt
 
   @@index([leadId, activityDate])
+  @@index([userId, isPlanned, activityDate])
   @@index([userId, activityDate])
   @@index([followUpDate])
   @@index([type, activityDate])

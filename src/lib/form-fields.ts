@@ -88,6 +88,20 @@ export const optionalDate = absentAsBlank
   )
 
 /**
+ * A date the form must supply, from `type="date"` or `type="datetime-local"`.
+ *
+ * `parseFormDate` handles both: a bare `yyyy-MM-dd` is built from its parts to
+ * keep the day the user picked (see above), and anything else falls through to
+ * `new Date`, which reads `2026-08-20T15:30` as local time. That is what makes
+ * this usable for scheduling, where the time is the point.
+ */
+export const requiredDate = (message: string) =>
+  absentAsBlank
+    .refine((value) => value !== '', message)
+    .transform((value) => parseFormDate(value))
+    .refine((value) => !Number.isNaN(value.getTime()), 'Enter a valid date.')
+
+/**
  * A web address typed by a user.
  *
  * Rejects anything that is not http(s) at the point of storage, so a

@@ -26,7 +26,9 @@ export default async function LeadTimelinePage({ params }: { params: Params }) {
 
   const [activities, canManage] = await Promise.all([
     prisma.activity.findMany({
-      where: { leadId: lead.id },
+      // History only. A planned call is an arrangement, not something that
+      // happened, and listing it here would date it in the past tense.
+      where: { leadId: lead.id, isPlanned: false },
       orderBy: { activityDate: 'desc' },
       select: {
         id: true,

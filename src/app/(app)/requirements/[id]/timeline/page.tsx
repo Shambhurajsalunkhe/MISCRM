@@ -29,7 +29,9 @@ export default async function RequirementTimelinePage({
 
   const [activities, canManage] = await Promise.all([
     prisma.activity.findMany({
-      where: { requirementId: requirement.id },
+      // History only. A planned call is an arrangement, not something that
+      // happened, and listing it here would date it in the past tense.
+      where: { requirementId: requirement.id, isPlanned: false },
       select: {
         id: true,
         type: true,

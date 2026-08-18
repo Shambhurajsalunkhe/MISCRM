@@ -7,7 +7,7 @@ import { prisma } from '@/lib/db'
 import { withAudit } from '@/lib/action'
 import { can } from '@/lib/authz'
 import { MANUAL_ACTIVITY_TYPES } from '@/lib/activity-types'
-import { optionalDate, optionalText } from '@/lib/form-fields'
+import { optionalDate, optionalText, requiredDate } from '@/lib/form-fields'
 import { PERMISSIONS } from '@/lib/permissions'
 import { resolveTarget, targetFromFormData, targetFromRow } from '@/lib/attachments'
 import { isActivityKind } from '@/lib/attachment-kinds'
@@ -146,5 +146,158 @@ export async function deleteActivityAction(
 
     revalidatePath(resolved.path)
     return actionSuccess('Activity deleted.')
+  })
+}
+
+/**
+ * Arrange a call or meeting: an `Activity` with `isPlanned`, dated forward.
+ *
+ * Separate from `logActivityAction` rather than a flag on it, because the two
+ * validate differently in ways that matter at the point of entry. A log accepts
+ * a blank date and means "now"; a plan without a date and time is not a plan, so
+ * the field is required. A log takes an outcome, which a plan cannot have yet.
+ *
+ * The date is deliberately *not* forced to be in the future. Somebody writing up
+ * Monday's diary on Tuesday morning would otherwise be told their own week is
+ * invalid, and the panel already sorts an overdue plan to the top and marks it
+ * so, which is more useful than a rejection.
+ */
+const planSchema = z.object({
+  type: z.enum(MANUAL_ACTIVITY_TYPES, { message: 'Choose an activity type.' }),
+  subject: z.string().trim().min(2, 'Say what this is about.').max(200),
+  notes: optionalText(4000),
+  activityDate: requiredDate('Choose a date and time.'),
+})
+
+export async function scheduleActivityAction(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  return withAudit(PERMISSIONS.ACTIVITY_MANAGE, async (actor) => {
+    const target = targetFromFormData(formData)
+    if (!target) return actionError('Choose the lead this is about.')
+
+    if (!isActivityKind(target.kind)) {
+      return actionError('Activities cannot be scheduled against that record.')
+    }
+
+    const parsed = planSchema.safeParse(formValues(formData))
+    if (!parsed.success) return fromZodError(parsed.error)
+
+    const resolved = await resolveTarget(actor, target)
+    if (!resolved) return actionError('That record no longer exists.')
+
+    await prisma.activity.create({
+      data: {
+        ...parsed.data,
+        isPlanned: true,
+        userId: actor.id,
+        ...resolved.link,
+      },
+    })
+
+    // Both the panel and the lead it belongs to.
+    revalidatePath('/leads')
+    revalidatePath(resolved.path)
+    return actionSuccess('Scheduled.')
+  })
+}
+
+/**
+ * Whose plan is it, and may this person change it?
+ *
+ * Owner-only, and not widened to LEAD_DELETE the way deleting a note is. A
+ * diary entry is an arrangement between one person and a client: moving
+ * somebody else's call does not correct a record, it changes a commitment they
+ * made and will be held to.
+ */
+async function ownPlan(
+  actorId: string,
+  id: unknown,
+): Promise<{ ok: true; id: string } | { ok: false; state: ActionState }> {
+  if (typeof id !== 'string' || id === '') {
+    return { ok: false, state: actionError('Missing the scheduled activity.') }
+  }
+
+  const plan = await prisma.activity.findUnique({
+    where: { id },
+    select: {
+      userId: true,
+      isPlanned: true,
+      leadId: true,
+      clientId: true,
+      requirementId: true,
+      candidateId: true,
+    },
+  })
+
+  if (!plan || !plan.isPlanned) {
+    return {
+      ok: false,
+      state: actionError('That scheduled activity no longer exists.'),
+    }
+  }
+
+  if (plan.userId !== actorId) {
+    return {
+      ok: false,
+      state: actionError('You can only change your own scheduled activities.'),
+    }
+  }
+
+  return { ok: true, id }
+}
+
+/** Move a scheduled call to a different date and time. */
+export async function rescheduleActivityAction(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  return withAudit(PERMISSIONS.ACTIVITY_MANAGE, async (actor) => {
+    const found = await ownPlan(actor.id, formData.get('id'))
+    if (!found.ok) return found.state
+
+    const parsed = requiredDate('Choose a date and time.').safeParse(
+      formValues(formData).activityDate,
+    )
+    if (!parsed.success) {
+      return actionError('Enter a valid date and time.', {
+        activityDate: 'Enter a valid date and time.',
+      })
+    }
+
+    await prisma.activity.update({
+      where: { id: found.id },
+      data: { activityDate: parsed.data },
+    })
+
+    revalidatePath('/leads')
+    return actionSuccess('Rescheduled.')
+  })
+}
+
+/**
+ * Mark a scheduled call as done, which turns the plan into the history entry
+ * for it — the same row, with the flag cleared.
+ *
+ * `activityDate` is left at the arranged time rather than moved to now. The
+ * arranged time is what the timeline should read, and a call marked done three
+ * days late is not a call that happened three days late.
+ */
+export async function completeActivityAction(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  return withAudit(PERMISSIONS.ACTIVITY_MANAGE, async (actor) => {
+    const found = await ownPlan(actor.id, formData.get('id'))
+    if (!found.ok) return found.state
+
+    await prisma.activity.update({
+      where: { id: found.id },
+      data: { isPlanned: false },
+    })
+
+    revalidatePath('/leads')
+    return actionSuccess('Marked as done. It is now in the lead’s timeline.')
   })
 }

@@ -25,7 +25,7 @@
 ### Leads
 | Route | Screen |
 |---|---|
-| `/leads` | List: filters, saved views, column chooser, bulk assign, CSV/Excel export |
+| `/leads` | List: filters, saved views, column chooser, bulk assign, CSV/Excel export. Below the list, a Timeline panel: the viewer's own arranged calls and meetings, soonest first, overdue at the top, with schedule / adjust / mark-done. No Vertical column -- the lead code prefix carries it |
 | `/leads/new` | Creation form — sections render by vertical (§6) |
 | `/leads/[id]` | Drill-down (§22) |
 | `/leads/board` | Kanban by stage, drag to change stage, one vertical at a time |

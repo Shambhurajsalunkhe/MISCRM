@@ -99,6 +99,8 @@ export default async function CandidateDetailPage({
         orderBy: { createdAt: 'desc' },
       },
       activities: {
+        // History only -- see the lead timeline for why.
+        where: { isPlanned: false },
         select: {
           id: true,
           type: true,

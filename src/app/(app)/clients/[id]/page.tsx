@@ -105,6 +105,8 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
         },
       },
       activities: {
+        // History only -- see the lead timeline for why.
+        where: { isPlanned: false },
         orderBy: { activityDate: 'desc' },
         take: 50,
         select: {

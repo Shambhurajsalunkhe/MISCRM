@@ -19,6 +19,8 @@ import { Input, Select } from '@/components/ui/field'
 import { PageHeader, EmptyState } from '@/components/ui/page'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { leadFilterQuery, leadWhere, pickLeadFilters } from './filters'
+import { UPCOMING_LIMIT, upcomingCalls } from '@/lib/leads/upcoming'
+import { UpcomingCalls } from '@/components/activity/upcoming-calls'
 import { SavedViews, type SavedViewItem } from './views/saved-views'
 
 export const metadata = { title: 'Leads · Sales CRM' }
@@ -51,6 +53,7 @@ export default async function LeadsPage({
     symbol,
     canExport,
     canCreate,
+    upcoming,
   ] = await Promise.all([
     prisma.lead.findMany({
       where,
@@ -67,7 +70,6 @@ export default async function LeadsPage({
         nextFollowUpAt: true,
         createdAt: true,
         client: { select: { id: true, clientName: true } },
-        vertical: { select: { name: true } },
         currentStage: { select: { name: true } },
         generatedBy: { select: { name: true } },
         assignedTo: { select: { name: true } },
@@ -116,6 +118,7 @@ export default async function LeadsPage({
     currencySymbol(),
     can(viewer, PERMISSIONS.DATA_EXPORT),
     can(viewer, PERMISSIONS.LEAD_CREATE),
+    upcomingCalls(viewer),
   ])
 
   const viewItems: SavedViewItem[] = views.map((view) => ({
@@ -322,7 +325,6 @@ export default async function LeadsPage({
               <TR>
                 <TH>Lead</TH>
                 <TH>Client</TH>
-                <TH>Vertical</TH>
                 <TH>Stage</TH>
                 <TH>Generated / assigned</TH>
                 <TH className="text-right">Value</TH>
@@ -359,7 +361,6 @@ export default async function LeadsPage({
                         {lead.client.clientName}
                       </a>
                     </TD>
-                    <TD className="text-slate-600">{lead.vertical.name}</TD>
                     <TD className="text-slate-600">
                       {lead.currentStage?.name ?? '—'}
                       <div className="text-xs text-slate-500">
@@ -409,6 +410,18 @@ export default async function LeadsPage({
           </p>
         </>
       )}
+
+      {/*
+        * Below the list rather than above it, and outside the empty-state
+        * branch: the pipeline is what this screen is for, but somebody whose
+        * filters match no leads still has calls to make today.
+        */}
+      <UpcomingCalls
+        calls={upcoming.calls}
+        leads={upcoming.schedulable}
+        truncated={upcoming.truncated}
+        limit={UPCOMING_LIMIT}
+      />
     </div>
   )
 }

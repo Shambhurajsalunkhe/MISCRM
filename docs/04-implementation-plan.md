@@ -647,6 +647,46 @@ deliberately disagree about the same question. The alternative — narrowing a
 BDM's scope everywhere — was considered and not taken, because a BDM still needs
 to work their team's pipeline.
 
+**A BDM can now arrange a call without opening a lead.** Scheduling was only
+possible from a lead's own timeline, so "what am I doing tomorrow" was a question
+you could answer one lead at a time and no other way. `/leads` gained a Timeline
+panel below the list: the viewer's arranged calls and meetings, soonest first,
+with the lead, client and subject on each row, and Adjust / Mark done beside it.
+Scheduling a new one from the panel picks the lead rather than starting from it.
+
+`Activity` grew one column, `isPlanned`, rather than gaining a table
+(`20260818160000_planned_activities`). A planned call and a logged call carry
+identical fields, and completing one is a state change rather than a copy:
+clearing the flag turns the arrangement into the history entry for the call that
+happened, at the time it was arranged for. The cost of one column is that every
+timeline reading history must filter `isPlanned: false` -- all four were updated
+in the same commit, and the schema comment says so, because a plan listed as
+history reads as a call that already took place.
+
+Two decisions worth keeping:
+
+- **The panel is the viewer's own diary, not their data scope.** A BDM sees their
+  sub-tree's leads in the list above it, but a colleague's arrangements are not
+  theirs to work from, and the question the panel answers is "what am I doing
+  next". Lead visibility is applied as well, so a plan on a lead that has moved
+  out of scope drops out rather than leaking a lead code. Adjusting and completing
+  are owner-only for the same reason, and deliberately not widened to
+  `LEAD_DELETE` the way deleting a note is: moving somebody else's call changes a
+  commitment they made rather than correcting a record.
+- **A past date is accepted, and shown.** Overdue plans stay in the list and sort
+  to the top, since soonest-first puts them there and they are what needs
+  attention. Rejecting a backdated entry would also refuse somebody writing up
+  Monday's diary on Tuesday.
+
+Nothing on the lead's own page shows its plans yet -- the fence is that history
+excludes them, so a scheduled call is visible in the panel and in no other place.
+That is the next small thing to add if it bites.
+
+**The Vertical column is gone from the lead list.** The lead code prefix already
+carries it, so `UP-0001` in the first column and "Upwork" in the third said the
+same thing twice, on the screen with the most columns in the application. It
+stays on the lead's own page, and stays as a filter on the list.
+
 ### Phase 8 — Optional, on your word
 Automation rules engine, targets and quotas (open question Q6), external
 integrations (Q4), mobile-responsive refinements.
