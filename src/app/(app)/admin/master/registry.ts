@@ -221,55 +221,6 @@ const lostReasons: MasterEntity = {
   },
 }
 
-const services: MasterEntity = {
-  slug: 'services',
-  title: 'Services',
-  noun: 'service',
-  description:
-    'The service a lead is asking about. Used by Digital Marketing and the general verticals.',
-  fields: [
-    { name: 'name', label: 'Name', type: 'text', required: true },
-    { name: 'category', label: 'Category', type: 'text' },
-  ],
-  list: async () => {
-    const rows = await prisma.service.findMany({
-      select: {
-        id: true,
-        name: true,
-        category: true,
-        isActive: true,
-        _count: { select: { leads: true } },
-      },
-      orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
-    })
-
-    return rows.map((row) => ({
-      id: row.id,
-      isActive: row.isActive,
-      values: { name: row.name, category: row.category ?? '' },
-      usage: plural(row._count.leads, 'lead'),
-    }))
-  },
-  save: async (id, values) => {
-    const name = values.name?.trim() ?? ''
-    const clash = await prisma.service.findUnique({ where: { name } })
-    if (clash && clash.id !== id) {
-      return { message: 'That service already exists.', field: 'name' }
-    }
-
-    const data = { name, category: orNull(values.category) }
-    if (id) {
-      await prisma.service.update({ where: { id }, data })
-    } else {
-      await prisma.service.create({ data })
-    }
-    return null
-  },
-  setActive: async (id, isActive) => {
-    await prisma.service.update({ where: { id }, data: { isActive } })
-  },
-}
-
 const products: MasterEntity = {
   slug: 'products',
   title: 'Products',
@@ -554,7 +505,6 @@ const requirementTypes: MasterEntity = {
 export const MASTER_ENTITIES: MasterEntity[] = [
   leadSources,
   lostReasons,
-  services,
   products,
   countries,
   requirementTypes,

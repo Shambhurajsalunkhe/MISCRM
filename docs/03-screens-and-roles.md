@@ -13,7 +13,7 @@
 ### Dashboard (README §24–§26)
 | Route | Screen |
 |---|---|
-| `/` | Role-aware dashboard. Admin sees the org view; BDM sees team; BDE sees own |
+| `/` | Role-aware dashboard. Admin sees the org view; a BDM and a BDE each see only the leads they generated or own |
 
 **Admin layout, matching your flowchart panel 4:**
 - KPI row — Total Leads, Open, Won, Lost, Won Revenue, Collected Revenue, Pending Revenue, Overall Conversion
@@ -97,7 +97,7 @@ Every report: filter bar, drill-through, Excel and PDF export.
 | `/admin/master/verticals` | Verticals, prefixes, module switches |
 | `/admin/master/stages` | Pipeline, requirement and candidate stage lists with common-stage mapping and aging thresholds |
 | `/admin/master/sources` | Lead sources |
-| `/admin/master/services`, `/products` | Service and product catalogue. Nothing reads the service catalogue since the lead form stopped offering a service — the screen still edits the table, but no other screen shows the result. Decide whether it goes. |
+| `/admin/master/products` | Product catalogue (Product Sales). The service catalogue is gone: its screen, its table and `Lead.serviceId` were all removed once no form offered a service. |
 | `/admin/master/countries` | Countries |
 | `/admin/master/lost-reasons` | Lost reasons, global or per vertical |
 | `/admin/master/tags` | Tags |

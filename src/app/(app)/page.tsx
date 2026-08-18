@@ -13,7 +13,7 @@ import {
   leadListHref,
   peopleScopeOf,
   PIPELINE_STAGES,
-  resolveAnalytics,
+  resolveDashboard,
 } from '@/lib/reports/filters'
 import {
   conversion,
@@ -56,10 +56,15 @@ const number = (value: number) => value.toLocaleString('en-GB')
  * applies the same filters to the lead list (README §37).
  *
  * **Role-aware without a second implementation.** There is no "BDE dashboard" —
- * there is one dashboard and the data scope of decision D7, so a BDE sees their
- * own leads in it, a BDM their sub-tree's, and a Sales Head the company's. The
- * header says which, because a KPI row is meaningless without knowing whose it
- * is. The revenue cards are the one thing that is genuinely gated rather than
+ * there is one dashboard and one scope rule: an Admin sees the company, and
+ * everybody else sees only the leads they generated or own. That is deliberately
+ * narrower than a BDM's data scope, which still covers their reporting sub-tree
+ * everywhere else in the app. This page answers "how am I doing", not "how is
+ * my team doing". `resolveDashboard` is where the rule lives, the header says
+ * whose leads are being counted, and every tile links through with `mine=1` so
+ * the list it opens contains exactly the rows behind the number.
+ *
+ * The revenue cards are the one thing that is genuinely gated rather than
  * scoped: `report.revenue` is a permission a BDE does not hold, and half a row of
  * cards is better than money figures shown to somebody who should not see them.
  *
@@ -102,7 +107,10 @@ export default async function DashboardPage({
     )
   }
 
-  const scope = await resolveAnalytics(viewer, params)
+  // Narrower than the role's data scope on purpose: this page answers "how am
+  // I doing", so a BDM counts only leads they generated or own even though the
+  // lead list and the reports still show their sub-tree's. See resolveDashboard.
+  const scope = await resolveDashboard(viewer, params)
 
   const [
     counts,
@@ -120,7 +128,7 @@ export default async function DashboardPage({
     reachedByVertical(scope, 'WON'),
     reachedByCommonStage(scope),
     pipelineValue(scope),
-    filterOptions(viewer),
+    filterOptions(viewer, scope.visible),
     currencySymbol(),
   ])
 
@@ -429,16 +437,18 @@ export default async function DashboardPage({
   )
 }
 
-/** What the data scope means for this role, in one clause. */
+/**
+ * Whose leads this page is counting, in one clause.
+ *
+ * Not the role's data scope: the dashboard is narrower than that for everyone
+ * but an Admin, so this says what the numbers are rather than what the role may
+ * reach. A BDM whose lead list shows their whole sub-tree needs the header to
+ * explain why the dashboard total is smaller.
+ */
 function scopeSentence(role: string): string {
-  switch (role) {
-    case 'ADMIN':
-      return 'every lead in the company'
-    case 'BDM':
-      return 'your leads and those of everyone reporting to you'
-    default:
-      return 'the leads you generated or own'
-  }
+  return role === 'ADMIN'
+    ? 'every lead in the company'
+    : 'only the leads you generated or own'
 }
 
 /**

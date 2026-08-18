@@ -12,9 +12,9 @@ import { isSafeExternalUrl } from '@/lib/safe-url'
  *  - **The input never rendered at all -> the key is absent from `FormData`
  *    entirely**, so `formValues()` omits it and Zod sees `undefined`.
  *
- * The second case is normal here, not exotic: the lead form shows a product
- * picker *or* a service picker but never both, and shows the campaign field
- * only for Digital Marketing. A schema built from `z.string().nullable()`
+ * The second case is normal here, not exotic: the lead form shows the product
+ * picker only for Product Sales, and the campaign field only for Digital
+ * Marketing. A schema built from `z.string().nullable()`
  * accepts `''` but rejects `undefined`, so every one of those submissions
  * failed validation — and failed invisibly, because the error was attached to
  * a field that was not on screen to highlight.

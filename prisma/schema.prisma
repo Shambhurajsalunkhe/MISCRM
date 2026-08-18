@@ -421,15 +421,6 @@ model LeadSource {
   @@unique([name, verticalId])
 }
 
-model Service {
-  id       String  @id @default(cuid())
-  name     String  @unique
-  category String?
-  isActive Boolean @default(true)
-
-  leads Lead[]
-}
-
 model Product {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -683,7 +674,6 @@ model Lead {
   // --- Requirement (README §6.2) ---
   verticalId          String
   sourceId            String?
-  serviceId           String?
   productId           String?
   title               String // "Requirement" — short summary shown in lists
   requirementDescription String?
@@ -732,7 +722,6 @@ model Lead {
   primaryContact ClientContact? @relation(fields: [primaryContactId], references: [id])
   vertical       SalesVertical  @relation(fields: [verticalId], references: [id])
   source         LeadSource?    @relation(fields: [sourceId], references: [id])
-  service        Service?       @relation(fields: [serviceId], references: [id])
   product        Product?       @relation(fields: [productId], references: [id])
   generatedBy    User           @relation("LeadGeneratedBy", fields: [generatedById], references: [id])
   assignedTo     User?          @relation("LeadAssignedTo", fields: [assignedToId], references: [id])

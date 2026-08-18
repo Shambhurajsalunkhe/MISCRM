@@ -89,7 +89,6 @@ export const AUDITED_MODELS: Record<string, AuditedModel> = {
   },
   LeadSource: { entityType: 'LEAD_SOURCE', idField: 'id', labelField: 'name' },
   LostReason: { entityType: 'LOST_REASON', idField: 'id', labelField: 'name' },
-  Service: { entityType: 'SERVICE', idField: 'id', labelField: 'name' },
   Product: { entityType: 'PRODUCT', idField: 'id', labelField: 'name' },
   Country: { entityType: 'COUNTRY', idField: 'id', labelField: 'name' },
   Tag: { entityType: 'TAG', idField: 'id', labelField: 'name' },

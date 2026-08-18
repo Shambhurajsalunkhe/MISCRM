@@ -51,12 +51,11 @@ const leadSchema = z.object({
   title: z.string().trim().min(3, 'Summarise the requirement.').max(200),
   requirementDescription: optionalText(4000),
   sourceId: optionalId,
-  // No `serviceId`. Neither lead form offers a service any more, and leaving it
-  // in the schema would be worse than removing it: the update action parses this
-  // same object, so an absent field would resolve to null and blank the service
-  // on every legacy lead the next time somebody saved an unrelated edit — the
-  // trap already noted for `sourceActivityId` below. Existing values stay put
-  // because nothing writes the column.
+  // No `serviceId`: the service catalogue is gone, column and all. It was
+  // removed from this schema before the column was dropped, because the update
+  // action parses this same object — an absent field would have resolved to null
+  // and blanked the service on every existing lead at the next unrelated save,
+  // the trap already noted for `sourceActivityId` below.
   productId: optionalId,
   expectedBudget: optionalMoney,
   expectedTimeline: optionalText(120),

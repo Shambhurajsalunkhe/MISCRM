@@ -31,6 +31,7 @@ import { reachedByVertical } from '@/lib/reports/aggregate'
 import {
   peopleScopeOf,
   resolveAnalytics,
+  resolveDashboard,
   type AnalyticsScope,
 } from '@/lib/reports/filters'
 import { pipelineValue, revenueTotals } from '@/lib/reports/kpis'
@@ -965,7 +966,11 @@ async function buildDashboard(
   viewer: CurrentUser,
   params: Params,
 ): Promise<ReportTable> {
-  const scope = await resolveAnalytics(viewer, params)
+  // resolveDashboard, not resolveAnalytics: the screen counts only the viewer's
+  // own leads unless they are an Admin, and an export that quietly used the
+  // wider role scope would hand somebody a file that disagrees with the page it
+  // was taken from. The eleven real reports keep the role scope.
+  const scope = await resolveDashboard(viewer, params)
 
   const [rows, verticals, reachedWon, revenue, meta] = await Promise.all([
     groupedPerformance(scope, 'verticalId', ['WON']),

@@ -21,7 +21,19 @@ export type FilterOptions = {
   teams: Array<{ id: string; name: string }>
 }
 
-export async function filterOptions(user: CurrentUser): Promise<FilterOptions> {
+/**
+ * `restrictPeople` narrows the two person pickers to a given set of ids.
+ *
+ * The dashboard passes its own scope, which for a BDM is just themselves: the
+ * page counts only their leads, so offering to filter by a colleague would be a
+ * control whose every setting returns nothing. `null` means no restriction,
+ * matching what `visibleUserIds` means by it, so an Admin's scope can be handed
+ * straight through.
+ */
+export async function filterOptions(
+  user: CurrentUser,
+  restrictPeople: string[] | null = null,
+): Promise<FilterOptions> {
   const [verticals, sources, people, teams] = await Promise.all([
     prisma.salesVertical.findMany({
       where: { isActive: true },
@@ -44,7 +56,9 @@ export async function filterOptions(user: CurrentUser): Promise<FilterOptions> {
   return {
     verticals,
     sources,
-    people: people.map((person) => ({ id: person.id, name: person.name })),
+    people: people
+      .filter((person) => !restrictPeople || restrictPeople.includes(person.id))
+      .map((person) => ({ id: person.id, name: person.name })),
     teams,
   }
 }

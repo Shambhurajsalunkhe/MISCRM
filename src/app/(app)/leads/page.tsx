@@ -277,6 +277,25 @@ export default async function LeadsPage({
           <Input id="to" name="to" type="date" defaultValue={filters.to ?? ''} />
         </div>
 
+        {/*
+          * A checkbox rather than a hidden parameter, because the dashboard
+          * links here with it set. An active filter with no control to see or
+          * clear it makes a short list look like missing data.
+          */}
+        <div className="flex items-center gap-2 sm:col-span-3 lg:col-span-2">
+          <input
+            id="mine"
+            name="mine"
+            type="checkbox"
+            value="1"
+            defaultChecked={filters.mine === '1'}
+            className="size-4 rounded border-slate-300"
+          />
+          <label htmlFor="mine" className="text-sm text-slate-700">
+            Only my leads
+          </label>
+        </div>
+
         <div className="flex gap-2 sm:col-span-3 lg:col-span-2">
           <button
             type="submit"
