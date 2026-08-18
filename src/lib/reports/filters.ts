@@ -153,13 +153,32 @@ export async function resolveAnalytics(
   const inScope = (id: string | undefined) =>
     id && (visible === null || visible.includes(id)) ? id : null
 
+  const bde = inScope(filters.bde)
+  const bdm = inScope(filters.bdm)
+
+  // `filters` has to say what was actually applied, not what was asked for.
+  // The loaders count with `bde`/`bdm` above, while `leadListHref` and the
+  // filter bar read `filters`, so a value `inScope` rejected must disappear
+  // from both, or a tile counts without the filter and then links to a list
+  // that applies it, and the two disagree with nothing on screen to explain it.
+  //
+  // Rejection used to be rare, needing a URL that named somebody outside the
+  // viewer's sub-tree. The dashboard's own-only narrowing makes it ordinary: for
+  // a BDM `visible` is just themselves, so any `?bde=` naming a colleague lands
+  // here. A dropped filter is not carried on to `/reports` either, which resolve
+  // the wider role scope and could have honoured it. A filter the numbers
+  // ignored is not one worth propagating.
+  const applied: AnalyticsFilters = { ...filters }
+  if (!bde) delete applied.bde
+  if (!bdm) delete applied.bdm
+
   return {
-    filters,
-    range: resolveRange(filters),
+    filters: applied,
+    range: resolveRange(applied),
     visible,
     ownOnly,
-    bde: inScope(filters.bde),
-    bdm: inScope(filters.bdm),
+    bde,
+    bdm,
     teamId: filters.team ?? null,
     verticalId: filters.vertical ?? null,
     sourceId: filters.source ?? null,

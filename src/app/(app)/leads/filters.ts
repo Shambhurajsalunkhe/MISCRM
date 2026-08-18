@@ -39,6 +39,12 @@ export const LEAD_FILTER_KEYS = [
   // list only the leads one person both sourced and owns. The dashboard links
   // here with it set: a BDM's dashboard counts this narrower set than their
   // role's data scope allows.
+  //
+  // Worth knowing before it surprises somebody: this is the one filter whose
+  // meaning depends on who is reading it, so a SavedView carrying it shows each
+  // viewer their own leads rather than the author's. That is what the label
+  // says, and a stored `bde=<author>` would be a different filter with a
+  // different name, so it is left as it is.
   'mine',
 ] as const
 
@@ -176,7 +182,11 @@ export async function leadWhere(user: CurrentUser, filters: LeadFilters) {
       // Inside the AND for the same reason as the search term above: this is
       // a third disjunction, and spread at the top level its `OR` would
       // silently replace the visibility scope's.
-      ...(filters.mine
+      // `=== '1'` rather than a truthiness test, matching the checkbox that
+      // renders it. On truthiness, `?mine=0` would switch the filter ON while
+      // the box showed it off, which is the invisible-filter problem the
+      // checkbox exists to prevent.
+      ...(filters.mine === '1'
         ? [{ OR: [{ generatedById: user.id }, { assignedToId: user.id }] }]
         : []),
     ],
