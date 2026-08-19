@@ -11,6 +11,7 @@ import { optionalDate, optionalText, requiredDate } from '@/lib/form-fields'
 import { PERMISSIONS } from '@/lib/permissions'
 import { resolveTarget, targetFromFormData, targetFromRow } from '@/lib/attachments'
 import { isActivityKind } from '@/lib/attachment-kinds'
+import type { CurrentUser } from '@/lib/auth/session'
 import {
   actionError,
   actionSuccess,
@@ -212,9 +213,12 @@ export async function scheduleActivityAction(
  * made and will be held to.
  */
 async function ownPlan(
-  actorId: string,
+  actor: CurrentUser,
   id: unknown,
-): Promise<{ ok: true; id: string } | { ok: false; state: ActionState }> {
+): Promise<
+  | { ok: true; id: string; path: string }
+  | { ok: false; state: ActionState }
+> {
   if (typeof id !== 'string' || id === '') {
     return { ok: false, state: actionError('Missing the scheduled activity.') }
   }
@@ -238,14 +242,29 @@ async function ownPlan(
     }
   }
 
-  if (plan.userId !== actorId) {
+  if (plan.userId !== actor.id) {
     return {
       ok: false,
       state: actionError('You can only change your own scheduled activities.'),
     }
   }
 
-  return { ok: true, id }
+  // The record the plan hangs off, so the caller can revalidate the lead as
+  // well as the panel. Marking a call done adds it to that lead's timeline;
+  // without this, a visit to the lead straight afterwards can be served the
+  // router's cached payload from before the change.
+  const target = targetFromRow(plan)
+  if (!target) {
+    return {
+      ok: false,
+      state: actionError('That scheduled activity is attached to a record you cannot see.'),
+    }
+  }
+
+  // The real actor, not a stand-in: resolveTarget applies the visibility
+  // filter, which reads the role as well as the id.
+  const resolved = await resolveTarget(actor, target)
+  return { ok: true, id, path: resolved?.path ?? '/leads' }
 }
 
 /** Move a scheduled call to a different date and time. */
@@ -254,7 +273,7 @@ export async function rescheduleActivityAction(
   formData: FormData,
 ): Promise<ActionState> {
   return withAudit(PERMISSIONS.ACTIVITY_MANAGE, async (actor) => {
-    const found = await ownPlan(actor.id, formData.get('id'))
+    const found = await ownPlan(actor, formData.get('id'))
     if (!found.ok) return found.state
 
     const parsed = requiredDate('Choose a date and time.').safeParse(
@@ -272,6 +291,7 @@ export async function rescheduleActivityAction(
     })
 
     revalidatePath('/leads')
+    revalidatePath(found.path)
     return actionSuccess('Rescheduled.')
   })
 }
@@ -289,7 +309,7 @@ export async function completeActivityAction(
   formData: FormData,
 ): Promise<ActionState> {
   return withAudit(PERMISSIONS.ACTIVITY_MANAGE, async (actor) => {
-    const found = await ownPlan(actor.id, formData.get('id'))
+    const found = await ownPlan(actor, formData.get('id'))
     if (!found.ok) return found.state
 
     await prisma.activity.update({
@@ -298,6 +318,7 @@ export async function completeActivityAction(
     })
 
     revalidatePath('/leads')
+    revalidatePath(found.path)
     return actionSuccess('Marked as done. It is now in the lead’s timeline.')
   })
 }

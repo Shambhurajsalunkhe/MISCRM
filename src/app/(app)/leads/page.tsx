@@ -420,6 +420,7 @@ export default async function LeadsPage({
         calls={upcoming.calls}
         leads={upcoming.schedulable}
         truncated={upcoming.truncated}
+        pickerTruncated={upcoming.pickerTruncated}
         limit={UPCOMING_LIMIT}
       />
     </div>

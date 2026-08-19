@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
@@ -50,11 +50,13 @@ export function UpcomingCalls({
   calls,
   leads,
   truncated,
+  pickerTruncated,
   limit,
 }: {
   calls: UpcomingCallView[]
   leads: SchedulableLead[]
   truncated: boolean
+  pickerTruncated: boolean
   limit: number
 }) {
   const [adding, setAdding] = useState(false)
@@ -76,7 +78,11 @@ export function UpcomingCalls({
       }
     >
       {adding ? (
-        <ScheduleForm leads={leads} onDone={() => setAdding(false)} />
+        <ScheduleForm
+          leads={leads}
+          truncated={pickerTruncated}
+          onDone={() => setAdding(false)}
+        />
       ) : null}
 
       {calls.length === 0 ? (
@@ -216,16 +222,32 @@ function RescheduleForm({ id, current }: { id: string; current: string }) {
 
 function ScheduleForm({
   leads,
+  truncated,
   onDone,
 }: {
   leads: SchedulableLead[]
+  truncated: boolean
   onDone: () => void
 }) {
   const [state, formAction] = useActionState(scheduleActivityAction, IDLE)
+  const formRef = useRef<HTMLFormElement>(null)
   const errors = state.fieldErrors ?? {}
+
+  // Clear and close once it is scheduled. Left open, the form keeps the lead,
+  // time and subject just submitted, so the obvious next action -- arrange
+  // another call -- starts from a filled-in form that looks like it has already
+  // been sent, and pressing the button again schedules the same call twice.
+  // The same trap `activity-form.tsx` documents having fallen into once.
+  useEffect(() => {
+    if (state.status === 'success') {
+      formRef.current?.reset()
+      onDone()
+    }
+  }, [state, onDone])
 
   return (
     <form
+      ref={formRef}
       action={formAction}
       className="mb-4 space-y-3 rounded-md border border-slate-200 bg-slate-50/60 p-3"
     >
@@ -236,7 +258,11 @@ function ScheduleForm({
           label="Lead"
           htmlFor="plan-lead"
           error={errors.leadId}
-          hint="The deal this call is about."
+          hint={
+            truncated
+              ? 'The deal this call is about. Showing the most recent open leads. If yours is missing, open it and arrange the call from its timeline.'
+              : 'The deal this call is about.'
+          }
           required
           className="sm:col-span-2"
         >

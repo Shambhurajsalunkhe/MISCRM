@@ -28,6 +28,7 @@ export async function upcomingCalls(viewer: CurrentUser): Promise<{
   calls: UpcomingCallView[]
   schedulable: SchedulableLead[]
   truncated: boolean
+  pickerTruncated: boolean
 }> {
   const visible = await leadVisibilityFilter(viewer)
 
@@ -71,7 +72,9 @@ export async function upcomingCalls(viewer: CurrentUser): Promise<{
     prisma.lead.findMany({
       where: { isDeleted: false, status: 'OPEN', ...visible },
       orderBy: { createdAt: 'desc' },
-      take: PICKER_LIMIT,
+      // One over the cap, so the panel can say the picker was cut rather than
+      // leaving somebody hunting for a lead that is simply not in the list.
+      take: PICKER_LIMIT + 1,
       select: {
         id: true,
         leadCode: true,
@@ -85,6 +88,7 @@ export async function upcomingCalls(viewer: CurrentUser): Promise<{
 
   return {
     truncated: rows.length > UPCOMING_LIMIT,
+    pickerTruncated: leads.length > PICKER_LIMIT,
     calls: rows.slice(0, UPCOMING_LIMIT).flatMap((row) =>
       // `leadId: { not: null }` already guarantees the join; the check is here
       // to satisfy the optional relation type rather than to catch anything.
@@ -119,7 +123,7 @@ export async function upcomingCalls(viewer: CurrentUser): Promise<{
     // Open leads only. Arranging a call on a deal that is already won or lost is
     // not something the picker should make easy; the lead's own timeline is
     // still there for the exception.
-    schedulable: leads.map((lead) => ({
+    schedulable: leads.slice(0, PICKER_LIMIT).map((lead) => ({
       id: lead.id,
       label: `${lead.leadCode} · ${lead.client.clientName} · ${lead.title}`,
     })),
