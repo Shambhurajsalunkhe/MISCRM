@@ -753,6 +753,21 @@ holds `report.view`, and the reports resolve their own wider scope, so
 is meant to reach the reports too, that is a separate decision about what
 `report.view` means rather than a change to this page.
 
+**The dashboard export followed the screen.** Removing the cross-vertical
+cards left a hole one button wide: `buildDashboard` still emitted a row per
+vertical, so a BDM pressing Excel, PDF or CSV downloaded the very table the
+page had just stopped showing them. The numbers were right -- the export
+already used `resolveDashboard`, so they were that person's own -- but the shape
+was the breakdown, most rows structurally zero. A narrowed scope now exports
+one row of its own totals through `buildOwnDashboard`, off the same loaders the
+screen uses, so the file and the page cannot disagree.
+
+**Two dependency advisories are outstanding and need a decision.** `npm audit`
+reports six high-severity issues: `postcss` and `sharp`, both transitive
+through `next`, plus `deepmerge-ts`. The only offered fix is `next@16.3.1`, a
+breaking major, so it is not something to take mid-feature. Worth doing
+deliberately with the deployment work rather than as a side effect.
+
 ### Phase 8 — Optional, on your word
 Automation rules engine, targets and quotas (open question Q6), external
 integrations (Q4), mobile-responsive refinements.

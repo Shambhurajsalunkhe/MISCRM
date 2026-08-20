@@ -27,14 +27,22 @@ import {
   requirementTotals,
   subReachedByStage,
 } from '@/lib/staffing/metrics'
-import { reachedByVertical } from '@/lib/reports/aggregate'
+import {
+  reachedByCommonStage,
+  reachedByVertical,
+} from '@/lib/reports/aggregate'
 import {
   peopleScopeOf,
   resolveAnalytics,
   resolveDashboard,
   type AnalyticsScope,
 } from '@/lib/reports/filters'
-import { pipelineValue, revenueTotals } from '@/lib/reports/kpis'
+import {
+  conversion,
+  leadCounts,
+  pipelineValue,
+  revenueTotals,
+} from '@/lib/reports/kpis'
 import {
   leadTriggerLabel,
   leadTriggerMetric,
@@ -957,6 +965,59 @@ async function buildStaffingTable(
 }
 
 /**
+ * The narrowed dashboard, exported: one row, the viewer's own totals.
+ *
+ * Same loaders as the screen, so the file and the page cannot disagree. The
+ * first column names the scope rather than a vertical, because that is what
+ * the single row is: everything this person generated or owns, whichever
+ * vertical it happens to sit in.
+ */
+async function buildOwnDashboard(scope: AnalyticsScope): Promise<ReportTable> {
+  const [counts, pipeline, revenue, reached, meta] = await Promise.all([
+    leadCounts(scope),
+    pipelineValue(scope),
+    revenueTotals(scope),
+    reachedByCommonStage(scope),
+    analyticsMeta(scope),
+  ])
+
+  return {
+    title: 'Dashboard summary',
+    subtitle:
+      'Your own leads only: the ones you generated or own. Counts are leads created in the period, so Open + Won + Lost equals Total. Won revenue is booked in the period; Pending is as at today.',
+    meta,
+    columns: [
+      { header: 'Scope', width: 22 },
+      { header: 'Leads', format: 'number' },
+      { header: 'Open', format: 'number' },
+      { header: 'Won (cohort)', format: 'number', width: 14 },
+      { header: 'Lost', format: 'number' },
+      { header: 'Reached won in period', format: 'number', width: 20 },
+      { header: 'Conversion %', format: 'percent', width: 14 },
+      { header: 'Pipeline', format: 'money', width: 16 },
+      { header: 'Won revenue', format: 'money', width: 16 },
+      { header: 'Collected', format: 'money', width: 16 },
+      { header: 'Pending', format: 'money', width: 16 },
+    ],
+    rows: [
+      [
+        'Your leads',
+        counts.total,
+        counts.open,
+        counts.won,
+        counts.lost,
+        reached.get('WON') ?? 0,
+        conversion(counts),
+        pipeline.total,
+        revenue.totals.won,
+        revenue.totals.collected,
+        revenue.totals.pending,
+      ],
+    ],
+  }
+}
+
+/**
  * The dashboard itself, exported.
  *
  * Not one of the eleven reports, but the screen most likely to be forwarded, and
@@ -971,6 +1032,13 @@ async function buildDashboard(
   // wider role scope would hand somebody a file that disagrees with the page it
   // was taken from. The eleven real reports keep the role scope.
   const scope = await resolveDashboard(viewer, params)
+
+  // A narrowed dashboard has no cross-vertical breakdown on screen, so its
+  // export must not have one either. Left as a row per vertical, the file
+  // handed back the very table the page withholds: correct numbers in the
+  // wrong shape, most rows structurally zero, and the fence defeated by the
+  // button beside it. One row of their own totals is what the page shows.
+  if (scope.ownOnly) return buildOwnDashboard(scope)
 
   const [rows, verticals, reachedWon, revenue, meta] = await Promise.all([
     groupedPerformance(scope, 'verticalId', ['WON']),
