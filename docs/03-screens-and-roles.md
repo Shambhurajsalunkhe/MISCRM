@@ -13,7 +13,7 @@
 ### Dashboard (README §24–§26)
 | Route | Screen |
 |---|---|
-| `/` | Role-aware dashboard. Admin sees the org view; a BDM and a BDE each see only the leads they generated or own |
+| `/` | Role-aware dashboard. Admin gets the org view, including the three cross-vertical breakdowns. A BDM and a BDE each see only the leads they generated or own, and no breakdown by vertical at all: their own KPIs, their pipeline, their follow-ups |
 
 **Admin layout, matching your flowchart panel 4:**
 - KPI row — Total Leads, Open, Won, Lost, Won Revenue, Collected Revenue, Pending Revenue, Overall Conversion
@@ -117,7 +117,7 @@ Every report: filter bar, drill-through, Excel and PDF export.
 
 ## 2. Permission matrix
 
-`✓` full · `◐` own/team scope only · `–` no access · `⊞` team-gated as well
+`✓` full · `◐` own/team scope only · `–` no access · `⊞` vertical-gated as well
 
 | Capability | BDE | BDM | Admin |
 |---|:--:|:--:|:--:|
@@ -142,13 +142,18 @@ Every report: filter bar, drill-through, Excel and PDF export.
 | Manage master data | – | – | ✓ |
 | View audit log | – | – | ✓ |
 
-**The two `⊞` rows are fenced by team as well as by role.** Recruitment is one
-team's work inside the single Sales department, so a tick in this grid is only
-half the answer for staffing — the person must also be on a team flagged *This
-team works on staffing* at `/admin/teams`. Administrators are exempt, being the
-role that administers the module.
+**The two `⊞` rows are fenced by vertical as well as by role.** Recruitment is
+one vertical's work, so a tick in this grid is only half the answer for
+staffing — the person must also work the Staffing vertical, set on their user
+record at `/admin/users`. Administrators are exempt, being the role that
+administers the module.
 
-Everyone else — BDMs and BDEs outside that team — has no Staffing
+This replaced a `Team.staffingAccess` flag when a user gained a vertical and
+lost their team: "works the Staffing vertical" says the same thing without a
+second switch to keep in step. One consequence — it can no longer be granted to
+somebody outside Staffing without moving them there.
+
+Everyone else — BDMs and BDEs in any other vertical — has no Staffing
 section in the sidebar, cannot reach `/requirements`, `/candidates` or
 `/placements` by URL, gets no Requirements tab on a staffing lead, and sees no
 requirement or candidate hits in global search. The check lives in one place,
@@ -158,9 +163,8 @@ sixteen separate ones. Staffing figures stay in the dashboard KPIs and the
 vertical, revenue and won/lost reports for whoever may read those reports — the
 fence is around the module, not around the company's totals.
 
-The flag is off for every team by default, including a team named "Staffing":
-access is granted deliberately, never acquired by creating a team or by naming it
-a particular way.
+Nobody acquires it by accident: a user with no vertical set is not in Staffing,
+so the module stays closed until somebody is deliberately put there.
 
 Two rows worth confirming, since README §32 leaves them open:
 

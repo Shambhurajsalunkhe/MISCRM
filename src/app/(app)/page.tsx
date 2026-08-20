@@ -112,38 +112,46 @@ export default async function DashboardPage({
   // lead list and the reports still show their sub-tree's. See resolveDashboard.
   const scope = await resolveDashboard(viewer, params)
 
-  const [
-    counts,
-    byVertical,
-    verticals,
-    reachedWon,
-    pipelineStages,
-    pipeline,
-    options,
-    symbol,
-  ] = await Promise.all([
+  // The cross-vertical breakdowns are the administrator view. A BDM or BDE
+  // dashboard answers "how am I doing", and a table with a row for every
+  // vertical in the company answers a different question — one their own
+  // numbers cannot even fill in, because every vertical they do not work is
+  // structurally zero for them. Keyed off `scope.ownOnly` rather than the role
+  // directly, so this and the narrowing that produced it cannot drift apart.
+  const showByVertical = !scope.ownOnly
+
+  const [counts, pipelineStages, pipeline, options, symbol] = await Promise.all([
     leadCounts(scope),
-    leadCountsByVertical(scope),
-    verticalsWithStages(),
-    reachedByVertical(scope, 'WON'),
     reachedByCommonStage(scope),
     pipelineValue(scope),
     filterOptions(viewer, scope.visible),
     currencySymbol(),
   ])
 
-  // Counters are only needed for the "input" column of Conversion by Vertical,
-  // and only the lead-trigger metric of each vertical — the last count before a
-  // Lead exists (open question Q1, now a per-metric checkbox in Master Data).
-  const counters = await counterTotals(scope.range, peopleScopeOf(scope), scope.verticalId)
+  // Four reads nothing else on the page uses, so they are not run for the
+  // people who will not see them — which is everybody but an administrator.
+  // `counterTotals` is the "input" column of Conversion by Vertical, and only
+  // the lead-trigger metric of each vertical: the last count before a Lead
+  // exists (open question Q1, now a per-metric checkbox in Master Data).
+  const breakdown = showByVertical
+    ? await (async () => {
+        const [byVertical, verticals, reachedWon, counters] = await Promise.all([
+          leadCountsByVertical(scope),
+          verticalsWithStages(),
+          reachedByVertical(scope, 'WON'),
+          counterTotals(scope.range, peopleScopeOf(scope), scope.verticalId),
+        ])
+        return { byVertical, verticals, reachedWon, counters }
+      })()
+    : null
 
   const revenue = canSeeRevenue ? await revenueTotals(scope) : null
 
-  const slices: Slice[] = verticals
+  const slices: Slice[] = (breakdown?.verticals ?? [])
     .map((vertical) => ({
       key: vertical.id,
       label: vertical.name,
-      value: byVertical.get(vertical.id)?.total ?? 0,
+      value: breakdown?.byVertical.get(vertical.id)?.total ?? 0,
       href: leadListHref(scope, { vertical: vertical.id }),
     }))
     .sort((a, b) => b.value - a.value)
@@ -298,22 +306,34 @@ export default async function DashboardPage({
         </StatRow>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card
-          title="Leads by vertical"
-          description="Share of the leads created in this period. Every slice opens the list behind it."
-        >
-          <Donut slices={slices} total={counts.total} />
-        </Card>
+      {breakdown ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card
+            title="Leads by vertical"
+            description="Share of the leads created in this period. Every slice opens the list behind it."
+          >
+            <Donut slices={slices} total={counts.total} />
+          </Card>
 
+          <Card
+            title="Pipeline overview"
+            description="Leads that passed through each common stage in this period (decision D12) — not leads sitting there now, so the bars do not sum to Total."
+          >
+            <Bars bars={stageBars} />
+          </Card>
+        </div>
+      ) : (
+        // Alone, so it takes the full width rather than leaving half a row
+        // empty where the vertical donut used to be.
         <Card
           title="Pipeline overview"
-          description="Leads that passed through each common stage in this period (decision D12) — not leads sitting there now, so the bars do not sum to Total."
+          description="Your leads that passed through each common stage in this period (decision D12) — not leads sitting there now, so the bars do not sum to Total."
         >
           <Bars bars={stageBars} />
         </Card>
-      </div>
+      )}
 
+      {breakdown ? (
       <Card
         title="Conversion by vertical"
         description="The input above the line, the leads below it, and what came out. The input column is each vertical's lead-trigger counter — the one Master Data marks as the last count before a lead exists."
@@ -329,7 +349,7 @@ export default async function DashboardPage({
           ) : undefined
         }
       >
-        {verticals.length === 0 ? (
+        {breakdown.verticals.length === 0 ? (
           <EmptyState>
             No active verticals. An administrator can restore them in Master
             Data.
@@ -347,13 +367,13 @@ export default async function DashboardPage({
               </TR>
             </THead>
             <TBody>
-              {verticals.map((vertical) => {
+              {breakdown.verticals.map((vertical) => {
                 const trigger = leadTriggerMetric(vertical.metrics)
                 const input = trigger.metric
-                  ? (counters.get(trigger.metric.id) ?? 0)
+                  ? (breakdown.counters.get(trigger.metric.id) ?? 0)
                   : null
-                const leads = byVertical.get(vertical.id)?.total ?? 0
-                const won = reachedWon.get(vertical.id) ?? 0
+                const leads = breakdown.byVertical.get(vertical.id)?.total ?? 0
+                const won = breakdown.reachedWon.get(vertical.id) ?? 0
 
                 return (
                   <TR key={vertical.id}>
@@ -392,8 +412,9 @@ export default async function DashboardPage({
           </Table>
         )}
       </Card>
+      ) : null}
 
-      {canSeeRevenue && revenue ? (
+      {canSeeRevenue && revenue && breakdown ? (
         <Card
           title="Revenue by vertical"
           description="Won in this period, against what has been collected and what is still owed. Won and Collected are flows; Pending is as at today."
@@ -408,7 +429,7 @@ export default async function DashboardPage({
           }
         >
           <Bars
-            bars={verticals
+            bars={breakdown.verticals
               .map((vertical) => {
                 const money = revenue.byVertical.get(vertical.id)
                 return {

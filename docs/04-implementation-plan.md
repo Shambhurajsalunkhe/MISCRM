@@ -729,6 +729,30 @@ it is a second pass: drop the team clause from visibility, retire the Team filte
 in favour of the Vertical one already beside it, drop `Lead.teamId` and
 `Team.staffingAccess`, and delete the screens.
 
+**The cross-vertical breakdowns are the administrator's alone.** The dashboard
+was already narrowed to the viewer's own leads, but it still drew Leads by
+vertical, Conversion by vertical and Revenue by vertical -- a row or a slice
+for all eight verticals, on a page whose numbers only cover one person. Every
+vertical they do not work was therefore structurally zero, which reads as a
+company doing no business rather than as a question the page cannot answer.
+All three now render only when the scope is not narrowed, which today means
+only for an administrator. A BDM or BDE gets their KPI rows, their pipeline
+overview across the common stages, and their follow-ups.
+
+Gated on `scope.ownOnly` rather than on the role, so the breakdown and the
+narrowing that made it meaningless cannot drift apart. It also takes four
+reads off the page for everybody but an administrator -- `leadCountsByVertical`,
+`verticalsWithStages`, `reachedByVertical` and `counterTotals` feed nothing
+else -- which is the first real cut into the eight-to-twelve queries this
+dashboard was noted for.
+
+Left alone deliberately: the revenue KPI cards, which are this person's own
+money rather than a vertical comparison, and the "All reports" button. A BDM
+holds `report.view`, and the reports resolve their own wider scope, so
+/reports/vertical still compares verticals across their sub-tree. If the fence
+is meant to reach the reports too, that is a separate decision about what
+`report.view` means rather than a change to this page.
+
 ### Phase 8 — Optional, on your word
 Automation rules engine, targets and quotas (open question Q6), external
 integrations (Q4), mobile-responsive refinements.
