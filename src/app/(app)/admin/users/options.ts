@@ -6,16 +6,16 @@ import type { UserFormOptions } from './user-form'
 
 /** The dropdown contents shared by the create and edit forms. */
 export async function loadUserFormOptions(): Promise<UserFormOptions> {
-  const [departments, teams, managers] = await Promise.all([
+  const [departments, verticals, managers] = await Promise.all([
     prisma.department.findMany({
       where: { isActive: true },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
-    prisma.team.findMany({
+    prisma.salesVertical.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, department: { select: { name: true } } },
-      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+      orderBy: { sortOrder: 'asc' },
     }),
     // Only active people, and only roles that can actually hold reports — a
     // chain that runs through a deactivated user would leave everyone beneath
@@ -29,11 +29,7 @@ export async function loadUserFormOptions(): Promise<UserFormOptions> {
 
   return {
     departments,
-    teams: teams.map((team) => ({
-      id: team.id,
-      name: team.name,
-      departmentName: team.department?.name ?? null,
-    })),
+    verticals,
     managers,
   }
 }

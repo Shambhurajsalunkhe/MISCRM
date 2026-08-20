@@ -93,10 +93,16 @@ export function TeamForm({
         </ButtonLink>
       </div>
 
+      {/*
+        * Kept, but it no longer decides anything. Staffing access now follows
+        * the vertical a person works, set on the user rather than the team, so
+        * this box would be a control that silently did nothing if it did not
+        * say so. It goes with the rest of Team.
+        */}
       <CheckboxField
         name="staffingAccess"
-        label="This team works on staffing"
-        hint="Its members reach Requirements, Candidates and Placements, as far as their role allows. Everyone else is outside the module — Administrators and the Sales Head excepted."
+        label="This team works on staffing (no longer used)"
+        hint="Staffing access now follows the vertical on the user record: whoever works the Staffing vertical reaches Requirements, Candidates and Placements, as far as their role allows. Set it at Users, not here. This box has no effect."
         defaultChecked={team?.staffingAccess ?? false}
       />
     </form>

@@ -243,6 +243,19 @@ export async function createLeadAction(
 
     const data = parsed.data
 
+    // Somebody fenced to a vertical creates in that one and no other. The
+    // form only offers theirs, so reaching here with a different id means a
+    // hand-made request or a form left open while an administrator moved them;
+    // either way the answer is no, not a silent substitution, because a lead
+    // filed under the wrong vertical takes its code prefix and stage history
+    // with it and cannot be moved afterwards.
+    if (actor.verticalId && data.verticalId !== actor.verticalId) {
+      return actionError(
+        'You can only create leads in your own vertical.',
+        { verticalId: 'This is not the vertical you work.' },
+      )
+    }
+
     const vertical = await prisma.salesVertical.findFirst({
       where: { id: data.verticalId, isActive: true },
       select: { id: true, leadPrefix: true, name: true },

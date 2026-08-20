@@ -74,7 +74,11 @@ export function LeadForm({
   const errors = state.fieldErrors ?? {}
 
   const [clientId, setClientId] = useState(defaultClientId ?? '')
-  const [newCompany, setNewCompany] = useState(false)
+  // Opens on the new-lead branch unless the form was opened from a client
+  // (`/leads/new?clientId=`), which says the account is already on file. Most
+  // leads are somebody nobody has dealt with yet, so the branch that needs
+  // typing is the one to show first.
+  const [newCompany, setNewCompany] = useState(!defaultClientId)
   const needsOverride = (state.warnings?.length ?? 0) > 0
 
   const contacts =
@@ -91,6 +95,19 @@ export function LeadForm({
         title="Vertical"
         description="Decides the lead code prefix, the stage list this lead follows and which modules it exposes. It cannot be changed afterwards — its stage history would no longer line up."
       >
+        {options.verticals.length === 1 ? (
+          // Fenced to one vertical, so there is nothing to choose. A disabled
+          // select would look like a control that had stopped working; a
+          // sentence says the same thing and does not invite a click. The
+          // hidden verticalId above still carries it.
+          <p className="text-sm text-slate-700">
+            <span className="font-medium">{options.verticals[0].name}</span>
+            <span className="text-slate-500">
+              {' '}
+              — the vertical you work. Every lead you create is filed here.
+            </span>
+          </p>
+        ) : (
         <Field label="Vertical" htmlFor="vertical-picker" required>
           <Select
             id="vertical-picker"
@@ -121,6 +138,7 @@ export function LeadForm({
             ))}
           </Select>
         </Field>
+        )}
 
         {layout.afterCreateNote ? (
           <p className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
@@ -130,8 +148,8 @@ export function LeadForm({
       </Card>
 
       <Card
-        title="Client"
-        description="A returning customer gets a new lead against the account we already have, never a second company record."
+        title="Who it is for"
+        description="Nobody here is a client yet, which is why the second option is a lead rather than a customer. A returning customer, on the other hand, gets a new lead against the account we already have, never a second record."
       >
         {/*
          * Both routes in are shown up front. The new-company branch used to be
@@ -147,7 +165,7 @@ export function LeadForm({
         >
           {[
             { value: false, label: 'Existing client' },
-            { value: true, label: 'New client' },
+            { value: true, label: 'New lead' },
           ].map((option) => (
             <button
               key={option.label}
@@ -189,9 +207,9 @@ export function LeadForm({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="Client name"
+                label="Lead name"
                 htmlFor="clientName"
-                hint="A person or a firm — whatever this client is called."
+                hint="A person or a firm. It becomes the client record if the deal is won."
                 error={errors.clientName}
                 required
               >

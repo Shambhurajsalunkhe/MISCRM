@@ -57,7 +57,7 @@ const baseUserSchema = z.object({
   designation: optionalText,
   phone: optionalText,
   departmentId: optionalId,
-  teamId: optionalId,
+  verticalId: optionalId,
   reportingManagerId: optionalId,
 })
 

@@ -62,7 +62,7 @@ export default async function UsersPage({
       isActive: true,
       lastLoginAt: true,
       department: { select: { name: true } },
-      team: { select: { name: true } },
+      vertical: { select: { name: true } },
       reportingManager: { select: { name: true } },
     },
     orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
@@ -141,7 +141,7 @@ export default async function UsersPage({
               <TR>
                 <TH>Name</TH>
                 <TH>Role</TH>
-                <TH>Department / team</TH>
+                <TH>Department / vertical</TH>
                 <TH>Reports to</TH>
                 <TH>Last sign-in</TH>
                 <TH>Status</TH>
@@ -174,9 +174,9 @@ export default async function UsersPage({
                   </TD>
                   <TD className="text-slate-600">
                     {user.department?.name ?? '—'}
-                    {user.team ? (
+                    {user.vertical ? (
                       <div className="text-xs text-slate-500">
-                        {user.team.name}
+                        {user.vertical.name}
                       </div>
                     ) : null}
                   </TD>

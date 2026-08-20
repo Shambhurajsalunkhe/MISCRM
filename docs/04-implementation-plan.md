@@ -687,6 +687,48 @@ carries it, so `UP-0001` in the first column and "Upwork" in the third said the
 same thing twice, on the screen with the most columns in the application. It
 stays on the lead's own page, and stays as a filter on the list.
 
+**A user works a vertical, not a team, and creates only in it.** Three changes
+that arrived together.
+
+*The lead form opens on a new lead, not an existing client.* The second option
+was called "New client", which nobody in it is yet -- the deal is not won. It is
+now "New lead", the field is "Lead name", and the form opens on that branch,
+because most leads are somebody nobody has dealt with before. Arriving from a
+client page with `?clientId=` still opens on the existing-client branch, which is
+the one case where the account really is on file.
+
+*`User.verticalId` replaces `User.teamId` on the user form.* The teams were named
+after the verticals, held nothing else, and `Lead` already carried `verticalId` --
+so the Team filter beside the Vertical filter on a lead list was the same question
+asked twice. Existing users were moved by matching their team's name to a
+vertical's, in `20260818180000_user_vertical`; a team whose name matches no
+vertical leaves its members unfenced, which is the safe direction, since the
+alternative is somebody who cannot create a lead and no visible reason why.
+
+*The fence is on creation, not on sight.* `/leads/new` offers only the viewer's
+vertical -- enforced on the query, so `?vertical=` naming another cannot reach
+past it, and checked again in `createLeadAction` because a hidden control is a
+courtesy rather than a boundary. A refusal rather than a silent substitution: a
+lead filed under the wrong vertical takes its code prefix and stage history with
+it and cannot be moved afterwards. Visibility is deliberately untouched, so a lead
+handed across verticals stays workable by whoever holds it. An administrator has
+no vertical and creates in all of them.
+
+Staffing access moves with it: `hasStaffingAccess` now asks whether somebody works
+the Staffing vertical rather than reading `Team.staffingAccess`. One switch fewer
+for an administrator to keep in step, and one consequence worth stating -- it can
+no longer be granted to somebody outside Staffing without moving them there. The
+flag and its checkbox still exist and are labelled as having no effect, because a
+control that silently does nothing is worse than one that says so.
+
+**Still to do, and deliberately not in that commit.** Team is now redundant but
+not gone. `visibleUserIds` still widens scope by team managed, `Lead.teamId` is
+still copied on assignment and still backs the Team filter on the lead list, the
+dashboard, the reports and prospecting, and `/admin/teams` still exists. Removing
+it is a second pass: drop the team clause from visibility, retire the Team filter
+in favour of the Vertical one already beside it, drop `Lead.teamId` and
+`Team.staffingAccess`, and delete the screens.
+
 ### Phase 8 — Optional, on your word
 Automation rules engine, targets and quotas (open question Q6), external
 integrations (Q4), mobile-responsive refinements.

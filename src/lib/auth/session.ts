@@ -63,6 +63,11 @@ export const getCurrentUser = cache(async () => {
       isActive: true,
       teamId: true,
       departmentId: true,
+      verticalId: true,
+      // The code, not just the id: the staffing fence and the lead form both
+      // ask which vertical this is, and joining for it on every request to
+      // learn a two-letter string would be a query per page.
+      vertical: { select: { id: true, code: true, name: true } },
       reportingManagerId: true,
     },
   })

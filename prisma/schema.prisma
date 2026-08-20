@@ -275,12 +275,22 @@ model User {
   avatarUrl          String?
   departmentId       String?
   teamId             String?
+  /// Which vertical this person works. Replaces the team they used to belong
+  /// to: the teams were named after the verticals and held nothing else, so
+  /// two columns meant one fact.
+  ///
+  /// It fences what they may create, not what they may see. A lead handed to
+  /// somebody from another vertical stays visible and workable, which is why
+  /// src/lib/visibility.ts is untouched by this. Null for an administrator,
+  /// who creates in any of them.
+  verticalId         String?
   reportingManagerId String?
   isActive           Boolean  @default(true)
   lastLoginAt        DateTime?
 
   department       Department? @relation(fields: [departmentId], references: [id])
   team             Team?       @relation("TeamMembers", fields: [teamId], references: [id])
+  vertical         SalesVertical? @relation(fields: [verticalId], references: [id])
   reportingManager User?       @relation("ReportingChain", fields: [reportingManagerId], references: [id])
   directReports    User[]      @relation("ReportingChain")
   managedTeams     Team[]      @relation("TeamManager")
@@ -316,6 +326,7 @@ model User {
 
   @@index([role, isActive])
   @@index([teamId])
+  @@index([verticalId])
   @@index([reportingManagerId])
 }
 
@@ -360,6 +371,7 @@ model SalesVertical {
   lostReasons LostReason[]
   sequences  LeadSequence[]
   prospectingActivities ProspectingActivity[]
+  members               User[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

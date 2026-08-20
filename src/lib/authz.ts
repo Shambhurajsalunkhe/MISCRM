@@ -33,51 +33,43 @@ const permissionsForRole = cache(async (role: UserRole) => {
 })
 
 /**
- * Staffing is the one module gated by *team* as well as by role.
+ * Staffing is the one module gated by which vertical somebody works, as well
+ * as by role.
  *
  * The permission matrix answers "may a BDE manage candidates at all", which is
- * a company-wide statement about the role — and the answer stayed yes even for
- * the BDEs who have never touched a requirement. Recruitment sits with one team
- * inside Sales, so the second question is which team the person is on, and
- * that is a data fact rather than another row in the matrix.
+ * a company-wide statement about the role, and the answer stayed yes even for
+ * BDEs who have never touched a requirement. Recruitment is one vertical, so
+ * the second question is which vertical the person works, and that is a data
+ * fact rather than another row in the matrix.
  *
- * Both are required: the permission says what the role may do, the flag says
- * whose work it is. Turning the flag on for a team does not hand its BDEs
- * capabilities their role never had.
+ * This replaces a `Team.staffingAccess` flag. The flag existed because a team
+ * was the only thing a person belonged to; now they belong to a vertical, and
+ * "works the Staffing vertical" is the same statement without an extra switch
+ * for an administrator to keep in step. One consequence worth stating: it can
+ * no longer be granted to somebody outside Staffing without moving them there.
  */
 const STAFFING_PERMISSIONS = new Set<string>([
   PERMISSIONS.STAFFING_REQUIREMENT_MANAGE,
   PERMISSIONS.STAFFING_CANDIDATE_MANAGE,
 ])
 
+/** The Staffing vertical, by the code the seed gives it. */
+const STAFFING_VERTICAL_CODE = 'ST'
+
 /**
- * Roles that reach staffing without belonging to a staffing team. Admin only:
- * it administers the module, and locking it out of a vertical it is accountable
- * for would only produce a support call. This was ['ADMIN', 'SALES_HEAD'] until
- * the role set went to three (D13); the fence itself did not change.
+ * Roles that reach staffing whatever vertical they work. Admin only: it
+ * administers the module, and locking it out of a vertical it is accountable
+ * for would only produce a support call.
  */
 const STAFFING_EXEMPT_ROLES: UserRole[] = ['ADMIN']
 
-const teamStaffingAccess = cache(async (teamId: string) => {
-  const team = await prisma.team.findUnique({
-    where: { id: teamId },
-    select: { staffingAccess: true },
-  })
-  return team?.staffingAccess ?? false
-})
-
 /**
- * Whether this user is inside the staffing module's fence at all — before any
+ * Whether this user is inside the staffing module fence at all, before any
  * question of which records they may see, which stays with `visibility.ts`.
- *
- * Deliberately does not consider `Team.isActive`: deactivating a team hides it
- * from the pickers and leaves its members where they are, and taking their
- * screens away as a side effect of tidying the org chart would be a surprise.
  */
-export async function hasStaffingAccess(user: CurrentUser): Promise<boolean> {
+export function hasStaffingAccess(user: CurrentUser): boolean {
   if (STAFFING_EXEMPT_ROLES.includes(user.role)) return true
-  if (!user.teamId) return false
-  return teamStaffingAccess(user.teamId)
+  return user.vertical?.code === STAFFING_VERTICAL_CODE
 }
 
 export async function can(

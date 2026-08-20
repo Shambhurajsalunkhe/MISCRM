@@ -11,7 +11,7 @@ import { ROLE_LABELS, ROLE_ORDER } from '@/lib/roles'
 
 export type UserFormOptions = {
   departments: Array<{ id: string; name: string }>
-  teams: Array<{ id: string; name: string; departmentName: string | null }>
+  verticals: Array<{ id: string; name: string }>
   managers: Array<{ id: string; name: string; role: UserRole }>
 }
 
@@ -24,7 +24,7 @@ export type UserFormValues = {
   designation: string | null
   phone: string | null
   departmentId: string | null
-  teamId: string | null
+  verticalId: string | null
   reportingManagerId: string | null
   isActive: boolean
 }
@@ -149,14 +149,21 @@ export function UserForm({
           </Select>
         </Field>
 
-        <Field label="Team" htmlFor="teamId" error={errors.teamId}>
-          <Select id="teamId" name="teamId" defaultValue={user?.teamId ?? ''}>
-            <option value="">— None —</option>
-            {options.teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.departmentName
-                  ? `${team.name} · ${team.departmentName}`
-                  : team.name}
+        <Field
+          label="Vertical"
+          htmlFor="verticalId"
+          error={errors.verticalId}
+          hint="Fixes which vertical this person creates leads in. Leave unset for somebody who works all of them."
+        >
+          <Select
+            id="verticalId"
+            name="verticalId"
+            defaultValue={user?.verticalId ?? ''}
+          >
+            <option value="">— All verticals —</option>
+            {options.verticals.map((vertical) => (
+              <option key={vertical.id} value={vertical.id}>
+                {vertical.name}
               </option>
             ))}
           </Select>

@@ -33,8 +33,16 @@ export default async function NewLeadPage({
 
   const { vertical: verticalParam, clientId } = await searchParams
 
+  // Somebody fenced to a vertical is offered only that one. The fence is on
+  // the query rather than on the picker, so `?vertical=` naming another one
+  // cannot reach past it -- the list it would have to be found in has a single
+  // row. `createLeadAction` checks it again on the way in, because a hidden
+  // control is a courtesy and not a boundary.
   const verticals = await prisma.salesVertical.findMany({
-    where: { isActive: true },
+    where: {
+      isActive: true,
+      ...(viewer.verticalId ? { id: viewer.verticalId } : {}),
+    },
     orderBy: { sortOrder: 'asc' },
     select: {
       id: true,

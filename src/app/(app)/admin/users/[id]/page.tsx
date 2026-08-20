@@ -35,7 +35,7 @@ export default async function EditUserPage({
       designation: true,
       phone: true,
       departmentId: true,
-      teamId: true,
+      verticalId: true,
       reportingManagerId: true,
       isActive: true,
       lastLoginAt: true,
