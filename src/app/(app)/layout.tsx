@@ -33,7 +33,10 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <aside className="flex w-60 shrink-0 flex-col bg-slate-900">
+      {/* Pinned to the viewport and capped at its height, so a long page
+          cannot stretch the sidebar past the fold: the nav scrolls inside
+          itself and the account footer stays reachable. */}
+      <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col bg-slate-900">
         <div className="px-5 py-5">
           <p className="text-sm font-semibold text-white">Sales CRM</p>
           <p className="text-xs text-slate-400">DigiMantra</p>

@@ -14,7 +14,10 @@ export function SidebarNav({ sections }: { sections: NavSection[] }) {
   const pathname = usePathname()
 
   return (
-    <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+    // `overscroll-contain` stops the wheel from carrying on into the page once
+    // the nav hits its own top or bottom — scrolling the sidebar should never
+    // move the content beside it.
+    <nav className="scrollbar-none min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 py-4">
       {sections.map((section) => (
         <div key={section.heading}>
           <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">

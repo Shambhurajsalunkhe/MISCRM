@@ -13,6 +13,18 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Hides a scroll container's scrollbar without disabling scrolling — wheel,
+   drag, touch and keyboard all still work. Used on the sidebar nav, where the
+   bar reads as a stray rule down the dark rail rather than as a control. */
+@utility scrollbar-none {
+  scrollbar-width: none; /* Firefox */
+
+  &::-webkit-scrollbar {
+    /* Chrome, Safari, Edge */
+    display: none;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
