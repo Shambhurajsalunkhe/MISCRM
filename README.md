@@ -10,6 +10,7 @@ Read these before changing the data model or funnel logic.
 
 | Document | Contents |
 |---|---|
+| [docs/05-project-overview.md](docs/05-project-overview.md) | **Start here.** What the product is, the user roles, the lead flow and the architecture, in plain language |
 | [docs/00-decisions.md](docs/00-decisions.md) | Every design decision, with its source, plus the open questions |
 | [docs/01-data-model.md](docs/01-data-model.md) | ERDs, ownership model, staffing hierarchy, visibility rules, indexing |
 | [docs/02-funnels-and-metrics.md](docs/02-funnels-and-metrics.md) | Stage lists per vertical and the formula for every metric |
@@ -74,7 +75,10 @@ so `npm run db:generate` is required after a fresh clone.
 | 2 — Clients, leads, the stage engine and search | Complete |
 | 3 — Prospecting counters and the vertical funnels | Complete |
 | 4 — Staffing: requirements, candidates, submissions, placements | Complete |
-| 5–8 | Not started — see the implementation plan |
+| 5 — Product Sales, Digital Marketing and money | Complete |
+| 6 — Dashboard, reports and analytics | Complete |
+| 7 — Notifications, imports, hardening, deployment | Partly — the staffing fence landed; the rest is open |
+| 8 — Automation rules, targets and quotas, integrations | Not started — optional |
 
 Uploaded documents are written to `storage/uploads/`, outside `public/` and
 git-ignored, and are served only through `/api/documents/[id]` after the same
