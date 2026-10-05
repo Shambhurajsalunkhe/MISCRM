@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: dmcrm_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dmcrm_app
+      POSTGRES_PASSWORD: dmcrm_password
+      POSTGRES_DB: dmcrm
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

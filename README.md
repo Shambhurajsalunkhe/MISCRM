@@ -1,4 +1,4 @@
-# Sales CRM
+# MISCRM (Sales CRM)
 
 Multi-vertical sales management, pipeline tracking, conversion analytics and
 revenue visibility for eight acquisition channels: Upwork, LinkedIn, Email,
@@ -23,35 +23,71 @@ Read these before changing the data model or funnel logic.
 Next.js 15 (App Router) · TypeScript · PostgreSQL 18 · Prisma 7 with
 `@prisma/adapter-pg` · Tailwind CSS 4 · `jose` + `bcryptjs` sessions.
 
-## Local setup
+## Quick Start
 
-Requires Node 20+ and a reachable PostgreSQL server.
+Requires **Node.js 20+** and **PostgreSQL** (or **Docker**).
 
-```bash
-npm install
-cp .env.example .env
-```
+### 🚀 Option 1: Quickstart with Docker (Recommended)
 
-Fill in `.env`:
+1. **Clone & Install Dependencies:**
+   ```bash
+   git clone https://github.com/Shambhurajsalunkhe/MISCRM.git
+   cd MISCRM
+   npm install
+   ```
 
-- `DATABASE_URL` — your PostgreSQL connection string. Percent-encode any
-  reserved characters in the password.
-- `AUTH_SECRET` — 32+ characters. Generate with
-  `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`
-- `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` — the first administrator account.
-  The password must be at least 10 characters.
+2. **Configure Environment:**
+   ```bash
+   cp .env.example .env
+   ```
+   Set `AUTH_SECRET` to a random value of at least 32 characters, and set
+   `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` before running setup. The seed
+   password must be at least 10 characters.
 
-Then create the schema and master data:
+3. **Start PostgreSQL Database:**
+   ```bash
+   docker compose up -d
+   ```
 
-```bash
-npm run db:generate
-npm run db:migrate
-npm run db:seed
-npm run dev
-```
+4. **Initialize Database & Seed Master Data:**
+   ```bash
+   npm run setup
+   ```
 
-The Prisma client is generated into `src/generated/` and is **not** committed,
-so `npm run db:generate` is required after a fresh clone.
+5. **Start Development Server:**
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+### 💻 Option 2: Quickstart with Local PostgreSQL
+
+1. **Clone & Install:**
+   ```bash
+   git clone https://github.com/Shambhurajsalunkhe/MISCRM.git
+   cd MISCRM
+   npm install
+   cp .env.example .env
+   ```
+
+2. **Configure `.env`:**
+   Update `DATABASE_URL` in `.env` with your local PostgreSQL credentials:
+   ```env
+   DATABASE_URL="postgresql://<user>:<password>@localhost:5432/dmcrm?schema=public"
+   ```
+
+3. **Initialize Database & Run:**
+   ```bash
+   npm run setup
+   npm run dev
+   ```
+
+---
+
+Configure the initial administrator email and password in `.env` before running
+`npm run setup`. Use a unique password of at least 10 characters.
 
 ## Scripts
 
