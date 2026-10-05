@@ -1,5 +1,9 @@
 # MISCRM (Sales CRM)
 
+MISCRM is an internal Management Information System and CRM that centralizes
+customer, lead, sales, and business data. It streamlines data management,
+tracks business activities, and provides reports and operational insights.
+
 Multi-vertical sales management, pipeline tracking, conversion analytics and
 revenue visibility for eight acquisition channels: Upwork, LinkedIn, Email,
 Cold Calling, Staffing, Digital Marketing, Product Sales and Other Sources.
